@@ -152,6 +152,24 @@
   .votebtn.active svg{ fill:var(--link); }
   .votebtn.active span{ color:var(--link); font-weight:700; }
 
+  .reactrow{ display:flex; flex-wrap:wrap; gap:6px; margin:4px 4px 0; }
+  .reactchip{ background:var(--input-bg); border:1px solid var(--input-border); border-radius:12px; padding:2px 8px; font-size:12px; color:var(--text-main); cursor:pointer; font-family:inherit; }
+  .reactchip.active{ border-color:var(--link); }
+  .reactchip.add{ font-weight:700; color:var(--dim); }
+  .emojiBtn{ font-size:22px; padding:8px 10px; border-radius:8px; }
+
+  .quoteblock{ border-left:3px solid var(--dim); padding:3px 8px; margin-bottom:4px; font-size:12px; color:var(--dim); background:rgba(0,0,0,.04); border-radius:4px; max-width:100%; }
+  .quoteblock .quotename{ font-weight:700; }
+  .quoteblock .quotetext{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  .replypreview{ display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--input-bg); border-top:1px solid var(--border); flex-shrink:0; }
+  .replypreview .replyinfo{ flex:1; min-width:0; font-size:12px; }
+  .replypreview .replyname{ font-weight:700; color:var(--link); }
+  .replypreview .replytext{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--dim); }
+  .replypreview .replycancel{ background:none; border:none; color:var(--dim); font-size:14px; cursor:pointer; }
+
+  .versionfooter{ text-align:center; font-size:11px; color:var(--dim); padding:16px 0 4px; }
+
   .inputbar{
     display:flex; align-items:center; gap:8px; padding:8px 10px; flex-shrink:0;
     background:linear-gradient(to bottom, var(--tab-top) 0%, var(--tab-bottom) 100%);
@@ -266,6 +284,10 @@
 
     <div class="panel hidden" id="homeBotChat">
       <div class="log" id="homeBotLog"></div>
+      <div class="replypreview hidden" id="homeBotReplyPreview">
+        <div class="replyinfo"><div class="replyname"></div><div class="replytext"></div></div>
+        <button class="replycancel" id="homeBotReplyCancel" type="button">✕</button>
+      </div>
       <div class="inputbar">
         <input type="text" id="homeBotInput" placeholder="新しいメッセージ" autocomplete="off">
         <button id="homeBotSend" class="glossy">送信</button>
@@ -311,6 +333,10 @@
 
     <div class="panel hidden" id="homeGroupChat">
       <div class="log" id="homeGroupLog"></div>
+      <div class="replypreview hidden" id="homeGroupReplyPreview">
+        <div class="replyinfo"><div class="replyname"></div><div class="replytext"></div></div>
+        <button class="replycancel" id="homeGroupReplyCancel" type="button">✕</button>
+      </div>
       <div class="inputbar">
         <input type="text" id="homeGroupInput" placeholder="新しいメッセージ" autocomplete="off">
         <button id="homeGroupSend" class="glossy">送信</button>
@@ -453,6 +479,7 @@
         <button class="actionbtn glossy" id="clearLogBtn">会話履歴を消す</button>
         <button class="actionbtn glossy danger" id="resetMemoryBtn">覚えた言葉をリセット</button>
       </div>
+      <div class="versionfooter" id="versionFooter"></div>
     </div>
   </div>
 
@@ -486,6 +513,28 @@
       </div>
     </div>
   </div>
+
+  <div class="sheetOverlay hidden" id="reactionPickerOverlay">
+    <div class="actionSheet">
+      <div style="display:flex; justify-content:space-around; padding:6px 0;">
+        <button class="emojiBtn glossy" type="button" data-emoji="👍">👍</button>
+        <button class="emojiBtn glossy" type="button" data-emoji="❤️">❤️</button>
+        <button class="emojiBtn glossy" type="button" data-emoji="😂">😂</button>
+        <button class="emojiBtn glossy" type="button" data-emoji="😮">😮</button>
+        <button class="emojiBtn glossy" type="button" data-emoji="😢">😢</button>
+        <button class="emojiBtn glossy" type="button" data-emoji="🔥">🔥</button>
+      </div>
+      <button class="glossy" id="reactionPickerCancel">キャンセル</button>
+    </div>
+  </div>
+
+  <div class="sheetOverlay hidden" id="mentionOverlay">
+    <div class="actionSheet">
+      <div class="section-title" style="margin-bottom:2px;">メンションする相手を選択</div>
+      <div id="mentionList"></div>
+      <button class="glossy" id="mentionCancel">キャンセル</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -495,6 +544,8 @@ const PALETTE = ['#e57373','#f2a65a','#f6c744','#81c784','#4fc3f7','#7986cb','#b
 const PERSON_SVG = '<svg viewBox="0 0 24 24"><path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2.5c-3.33 0-10 1.67-10 5v2.5h20V19.5c0-3.33-6.67-5-10-5z"/></svg>';
 const THUMB_UP_SVG = '<svg viewBox="0 0 24 24"><path d="M2 21h2a1 1 0 001-1v-9a1 1 0 00-1-1H2v11zM22 10.5a2 2 0 00-2-2h-6.31l.95-4.57.03-.32a1.5 1.5 0 00-.44-1.06L13.17 1 7.59 6.59A2 2 0 007 8v10a2 2 0 002 2h9a2 2 0 001.84-1.21l3-7A2 2 0 0022 10.5z"/></svg>';
 const THUMB_DOWN_SVG = '<svg viewBox="0 0 24 24"><path d="M22 3h-2a1 1 0 00-1 1v9a1 1 0 001 1h2V3zM2 13.5a2 2 0 002 2h6.31l-.95 4.57-.03.32a1.5 1.5 0 00.44 1.06L10.83 23l5.58-5.59A2 2 0 0017 16V6a2 2 0 00-2-2H6a2 2 0 00-1.84 1.21l-3 7A2 2 0 002 13.5z"/></svg>';
+const APP_VERSION = '2026.09.14';
+const REACTION_EMOJIS = ['👍','❤️','😂','😮','😢','🔥'];
 
 let bots = [];
 let groups = [];
@@ -525,6 +576,9 @@ let newGroupColor = '#8a8f95';
 let newBotColor = '#8a8f95';
 let newGroupMemberSet = new Set();
 let plazaTimer = null;
+let replyTarget = null;   // { mid, name, text } - 返信中のメッセージ
+let reactionTarget = null; // { entry, contextType, contextId } - リアクション選択中
+let mentionActiveInputId = null;
 
 function uid(){ try{ return crypto.randomUUID(); }catch(e){ return 'x'+Date.now()+Math.floor(Math.random()*1000); } }
 function randomColor(){ return PALETTE[Math.floor(Math.random()*PALETTE.length)]; }
@@ -615,6 +669,9 @@ function isLatinText(s){
 function endMarks(s){
   return isLatinText(s) ? {q:'?', e:'!', p:'.'} : {q:'？', e:'！', p:'。'};
 }
+function stripEndPunct(s){
+  return s.replace(/[。！？!?.]+$/, '');
+}
 function randomEnding(text){
   const marks = endMarks(text);
   if(/[。！？!?.]$/.test(text)){
@@ -636,6 +693,12 @@ function pickCombineCount(poolSize){
   if(r < p2) return 2;
   return poolSize>=3 ? 3 : 2;
 }
+function spliceFragments(a, b){
+  if(a.length < 2 || b.length < 2) return a + b;
+  const cut1 = 1 + Math.floor(Math.random()*(a.length-1));
+  const cut2 = 1 + Math.floor(Math.random()*(b.length-1));
+  return a.slice(0, cut1) + b.slice(cut2);
+}
 function generateReply(vocabPool, currentFragments){
   const vocabSize = vocabPool ? vocabPool.length : 0;
   const parrotChance = Math.max(0.12, 0.30 - vocabSize/300);
@@ -644,13 +707,22 @@ function generateReply(vocabPool, currentFragments){
   }
   const pool = (vocabPool && vocabPool.length > 0) ? vocabPool : currentFragments;
   if(!pool || pool.length === 0) return '…';
+
+  // 覚えた言葉同士を混ぜて、単なる連結以上の「自分なりの言葉」を作ることがある
+  if(pool.length >= 2 && Math.random() < 0.3){
+    const a = pick(pool), b = pick(pool);
+    if(a !== b){
+      const blended = spliceFragments(stripEndPunct(a), stripEndPunct(b));
+      if(blended.length >= 2) return randomEnding(blended);
+    }
+  }
+
   const combineCount = pickCombineCount(pool.length);
   let parts = [];
-  for(let i=0;i<combineCount;i++) parts.push(pick(pool));
+  for(let i=0;i<combineCount;i++) parts.push(stripEndPunct(pick(pool)));
   let base = parts[0];
   for(let i=1;i<parts.length;i++){
-    const marks = endMarks(parts[i-1]);
-    base += (Math.random() < 0.2 ? marks.p : '') + parts[i];
+    base += (Math.random() < 0.3 ? '、' : '') + parts[i];
   }
   return randomEnding(base);
 }
@@ -685,7 +757,7 @@ function avatarEl(name, color, avatar){
   }
   return div;
 }
-function renderMsg(entry, containerId, showName){
+function renderMsg(entry, containerId, showName, contextType, contextId){
   const log = document.getElementById(containerId || 'homeBotLog');
   const row = document.createElement('div');
   row.className = 'row ' + entry.who;
@@ -696,6 +768,14 @@ function renderMsg(entry, containerId, showName){
     nm.className = 'botname'; nm.style.color = entry.botColor; nm.textContent = entry.botName;
     col.appendChild(nm);
   }
+  if(entry.replyTo){
+    const q = document.createElement('div');
+    q.className = 'quoteblock';
+    const qn = document.createElement('div'); qn.className='quotename'; qn.textContent = entry.replyTo.name;
+    const qt = document.createElement('div'); qt.className='quotetext'; qt.textContent = entry.replyTo.text;
+    q.appendChild(qn); q.appendChild(qt);
+    col.appendChild(q);
+  }
   const bubble = document.createElement('div');
   bubble.className = 'bubble ' + entry.who;
   bubble.textContent = entry.text;
@@ -705,6 +785,9 @@ function renderMsg(entry, containerId, showName){
     t.className = 'msgtime'; t.textContent = entry.ts;
     col.appendChild(t);
   }
+  if(entry.mid && contextType){
+    col.appendChild(renderReactionRow(entry, contextType, contextId));
+  }
   if(entry.who === 'bot'){
     row.appendChild(avatarEl(entry.botName, entry.botColor, entry.botAvatar));
     row.appendChild(col);
@@ -712,9 +795,42 @@ function renderMsg(entry, containerId, showName){
     row.appendChild(col);
     if(userAvatar) row.appendChild(avatarEl('あなた', '#4fbf67', userAvatar));
   }
+  if(entry.mid) attachSwipeReply(row, entry);
   log.appendChild(row);
   log.scrollTop = log.scrollHeight;
   return row;
+}
+function attachSwipeReply(row, entry){
+  let startX = 0, startY = 0, tracking = false;
+  row.style.touchAction = 'pan-y';
+  row.addEventListener('pointerdown', e=>{ tracking = true; startX = e.clientX; startY = e.clientY; });
+  row.addEventListener('pointerup', e=>{
+    if(!tracking) return;
+    tracking = false;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if(dx < -50 && Math.abs(dx) > Math.abs(dy) * 1.5){
+      setReplyTarget(entry);
+    }
+  });
+  row.addEventListener('pointercancel', ()=>{ tracking = false; });
+}
+function setReplyTarget(entry){
+  replyTarget = { mid: entry.mid, name: entry.who==='bot' ? entry.botName : 'あなた', text: entry.text };
+  renderReplyPreview();
+}
+function clearReplyTarget(){ replyTarget = null; renderReplyPreview(); }
+function renderReplyPreview(){
+  ['homeBotReplyPreview','homeGroupReplyPreview'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    if(replyTarget){
+      el.classList.remove('hidden');
+      el.querySelector('.replyname').textContent = replyTarget.name;
+      el.querySelector('.replytext').textContent = replyTarget.text;
+    } else {
+      el.classList.add('hidden');
+    }
+  });
 }
 function renderPlazaMsg(entry){
   const log = document.getElementById('plazaLogEl');
@@ -769,20 +885,29 @@ function computeVotes(entry){
   return { up, down };
 }
 function renderVoteRow(entry, groupId){
-  const { up, down } = computeVotes(entry);
-  const myVote = entry.votes && entry.votes.voters && entry.votes.voters['user'];
   const row = document.createElement('div');
   row.className = 'voterow';
-  const upBtn = document.createElement('button');
-  upBtn.className = 'votebtn' + (myVote==='up' ? ' active' : ''); upBtn.type='button';
-  upBtn.innerHTML = THUMB_UP_SVG + `<span>${up}</span>`;
-  const downBtn = document.createElement('button');
-  downBtn.className = 'votebtn' + (myVote==='down' ? ' active' : ''); downBtn.type='button';
-  downBtn.innerHTML = THUMB_DOWN_SVG + `<span>${down}</span>`;
+  row.dataset.mid = entry.mid;
+  const upBtn = document.createElement('button'); upBtn.type = 'button';
+  const downBtn = document.createElement('button'); downBtn.type = 'button';
   upBtn.addEventListener('click', ()=> castUserVote(entry, 'up', groupId));
   downBtn.addEventListener('click', ()=> castUserVote(entry, 'down', groupId));
   row.appendChild(upBtn); row.appendChild(downBtn);
+  paintVoteRow(row, entry);
   return row;
+}
+function paintVoteRow(row, entry){
+  const { up, down } = computeVotes(entry);
+  const myVote = entry.votes && entry.votes.voters && entry.votes.voters['user'];
+  const upBtn = row.children[0], downBtn = row.children[1];
+  upBtn.className = 'votebtn' + (myVote==='up' ? ' active' : '');
+  downBtn.className = 'votebtn' + (myVote==='down' ? ' active' : '');
+  upBtn.innerHTML = THUMB_UP_SVG + `<span>${up}</span>`;
+  downBtn.innerHTML = THUMB_DOWN_SVG + `<span>${down}</span>`;
+}
+function refreshVoteRow(entry){
+  const row = document.querySelector(`.voterow[data-mid="${entry.mid}"]`);
+  if(row) paintVoteRow(row, entry);
 }
 function checkMessageKick(entry, group){
   if(!group || !entry || entry.who !== 'bot') return;
@@ -793,37 +918,129 @@ function checkMessageKick(entry, group){
   if(down >= threshold){
     group.memberIds = group.memberIds.filter(id=>id!==entry.botId);
     const bot = bots.find(b=>b.id===entry.botId);
+    const noteText = `${bot?bot.name:'?'} は低評価が過半数を超えたため、グループから退出させられました。`;
     if(!groupChats[group.id]) groupChats[group.id] = [];
-    groupChats[group.id].push({ who:'system', text:`${bot?bot.name:'?'} は低評価が過半数を超えたため、グループから退出させられました。`, ts:nowHHMM() });
+    groupChats[group.id].push({ who:'system', text:noteText, ts:nowHHMM() });
+    if(currentTab==='home' && homeSubView==='groupchat' && currentGroupId===group.id){
+      addSystemNote('homeGroupLog', noteText);
+    }
   }
 }
 async function castUserVote(entry, choice, groupId){
   if(!entry.votes) entry.votes = { voters:{} };
-  entry.votes.voters['user'] = choice; // 何度でも変更可能
+  if(entry.votes.voters['user'] === choice){
+    delete entry.votes.voters['user'];
+  } else {
+    entry.votes.voters['user'] = choice;
+  }
   const group = groups.find(g=>g.id===groupId);
   checkMessageKick(entry, group);
-  renderGroupLogFromScratch(groupId);
+  refreshVoteRow(entry);
   await Promise.all([saveGroupChats(), saveGroups(), saveBots()]);
 }
+
+/* ---- リアクション ---- */
+function computeReactionCounts(entry){
+  const counts = {};
+  const reactions = entry.reactions || {};
+  Object.values(reactions).forEach(e=>{ counts[e] = (counts[e]||0)+1; });
+  return counts;
+}
+function renderReactionRow(entry, contextType, contextId){
+  const row = document.createElement('div');
+  row.className = 'reactrow';
+  row.dataset.mid = entry.mid;
+  row.dataset.ctxType = contextType;
+  row.dataset.ctxId = contextId;
+  paintReactionRow(row, entry);
+  return row;
+}
+function paintReactionRow(row, entry){
+  row.innerHTML = '';
+  const contextType = row.dataset.ctxType, contextId = row.dataset.ctxId;
+  const counts = computeReactionCounts(entry);
+  const myReaction = entry.reactions && entry.reactions['user'];
+  Object.keys(counts).forEach(emoji=>{
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'reactchip' + (myReaction===emoji ? ' active' : '');
+    chip.textContent = `${emoji} ${counts[emoji]}`;
+    chip.addEventListener('click', async ()=>{
+      if(!entry.reactions) entry.reactions = {};
+      if(entry.reactions['user'] === emoji) delete entry.reactions['user'];
+      else entry.reactions['user'] = emoji;
+      refreshReactionRow(entry);
+      if(contextType === 'bot') await saveIndividualChats(); else await saveGroupChats();
+    });
+    row.appendChild(chip);
+  });
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'reactchip add';
+  addBtn.textContent = '+';
+  addBtn.addEventListener('click', ()=> openReactionPicker(entry, contextType, contextId));
+  row.appendChild(addBtn);
+}
+function refreshReactionRow(entry){
+  const row = document.querySelector(`.reactrow[data-mid="${entry.mid}"]`);
+  if(row) paintReactionRow(row, entry);
+}
+function openReactionPicker(entry, contextType, contextId){
+  reactionTarget = { entry, contextType, contextId };
+  document.getElementById('reactionPickerOverlay').classList.remove('hidden');
+}
+document.querySelectorAll('.emojiBtn').forEach(btn=>{
+  btn.addEventListener('click', async ()=>{
+    if(!reactionTarget) return;
+    const { entry, contextType } = reactionTarget;
+    const emoji = btn.dataset.emoji;
+    if(!entry.reactions) entry.reactions = {};
+    if(entry.reactions['user'] === emoji) delete entry.reactions['user'];
+    else entry.reactions['user'] = emoji;
+    document.getElementById('reactionPickerOverlay').classList.add('hidden');
+    refreshReactionRow(entry);
+    if(contextType === 'bot') await saveIndividualChats(); else await saveGroupChats();
+    reactionTarget = null;
+  });
+});
+document.getElementById('reactionPickerCancel').addEventListener('click', ()=>{
+  document.getElementById('reactionPickerOverlay').classList.add('hidden');
+  reactionTarget = null;
+});
+
 function stopGroupVoteTicker(){ if(groupVoteTimer){ clearInterval(groupVoteTimer); groupVoteTimer = null; } }
 function startGroupVoteTicker(groupId){
   stopGroupVoteTicker();
-  if(!likeDislikeEnabled) return;
   groupVoteTimer = setInterval(async ()=>{
     if(currentTab !== 'home' || homeSubView !== 'groupchat' || currentGroupId !== groupId) return;
     const group = groups.find(g=>g.id===groupId);
     if(!group) return;
-    const botMsgs = (groupChats[groupId] || []).filter(e=>e.who==='bot' && group.memberIds.includes(e.botId));
-    if(botMsgs.length === 0) return;
-    const entry = pick(botMsgs);
-    const eligible = group.memberIds.filter(id=>id !== entry.botId);
-    if(eligible.length === 0) return;
-    const voterId = pick(eligible);
-    if(!entry.votes) entry.votes = { voters:{} };
-    entry.votes.voters[voterId] = Math.random() < 0.5 ? 'up' : 'down'; // 気が変わって入れ替わることもある
-    checkMessageKick(entry, group);
-    renderGroupLogFromScratch(groupId);
-    await Promise.all([saveGroupChats(), saveGroups(), saveBots()]);
+    const allMsgs = (groupChats[groupId] || []).filter(e=>e.who !== 'system');
+    if(allMsgs.length === 0) return;
+
+    if(likeDislikeEnabled && Math.random() < 0.5){
+      const botMsgs = allMsgs.filter(e=>e.who==='bot' && group.memberIds.includes(e.botId));
+      if(botMsgs.length === 0) return;
+      const entry = pick(botMsgs);
+      const eligible = group.memberIds.filter(id=>id !== entry.botId);
+      if(eligible.length === 0) return;
+      const voterId = pick(eligible);
+      if(!entry.votes) entry.votes = { voters:{} };
+      entry.votes.voters[voterId] = Math.random() < 0.5 ? 'up' : 'down';
+      checkMessageKick(entry, group);
+      refreshVoteRow(entry);
+      await Promise.all([saveGroupChats(), saveGroups(), saveBots()]);
+    } else {
+      const entry = pick(allMsgs);
+      const senderId = entry.who === 'bot' ? entry.botId : null;
+      const eligible = group.memberIds.filter(id=>id !== senderId);
+      if(eligible.length === 0) return;
+      const reactorId = pick(eligible);
+      if(!entry.reactions) entry.reactions = {};
+      entry.reactions[reactorId] = pick(REACTION_EMOJIS);
+      refreshReactionRow(entry);
+      await saveGroupChats();
+    }
   }, 3000 + Math.random()*3000);
 }
 
@@ -975,6 +1192,8 @@ async function loadAll(){
   groups.forEach(g=>{ if(!g.memberIds) g.memberIds = []; if(g.bg === undefined) g.bg = null; if(g.avatar === undefined) g.avatar = null; });
   try{ const r = await storageGet('jinkoumunou-individual-chats', false); if(r && r.value) individualChats = JSON.parse(r.value); }catch(e){}
   try{ const r = await storageGet('jinkoumunou-group-chats', false); if(r && r.value) groupChats = JSON.parse(r.value); }catch(e){}
+  Object.values(individualChats).forEach(arr=>{ (arr||[]).forEach(e=>{ if(!e.mid) e.mid = uid(); }); });
+  Object.values(groupChats).forEach(arr=>{ (arr||[]).forEach(e=>{ if(!e.mid) e.mid = uid(); }); });
   try{ const r = await storageGet('jinkoumunou-plaza-log', false); if(r && r.value) plazaLog = JSON.parse(r.value); }catch(e){}
   try{ const r = await storageGet('jinkoumunou-theme', false); if(r && r.value) theme = r.value; }catch(e){}
   try{ const r = await storageGet('jinkoumunou-bg', false); if(r && r.value) bgImage = r.value; }catch(e){}
@@ -1191,13 +1410,14 @@ function openBotChat(id){
   currentBotId = id;
   homeSubView = 'botchat';
   showHomeSub('botchat');
+  clearReplyTarget();
   const bot = bots.find(b=>b.id===id);
   const log = document.getElementById('homeBotLog');
   log.innerHTML = '';
   applyLogBg('homeBotLog', bot ? bot.bg : null);
   addTimestamp('homeBotLog');
   const history = individualChats[id] || [];
-  if(history.length > 0) history.forEach(e=>renderMsg(e, 'homeBotLog', false));
+  if(history.length > 0) history.forEach(e=>renderMsg(e, 'homeBotLog', false, 'bot', id));
   else addSystemNote('homeBotLog', 'まだ何も話していません。話しかけて言葉を教えてください。');
   updateHeaderChrome();
   renderHeaderFor('home');
@@ -1208,26 +1428,34 @@ async function handleBotSend(){
   if(!text || !currentBotId) return;
   const bot = bots.find(b=>b.id===currentBotId);
   if(!bot) return;
-  const userEntry = { who:'user', text, ts:nowHHMM() };
+  const userEntry = { who:'user', text, ts:nowHHMM(), mid:uid() };
+  if(replyTarget) userEntry.replyTo = { name:replyTarget.name, text:replyTarget.text };
+  clearReplyTarget();
   if(!individualChats[bot.id]) individualChats[bot.id] = [];
   individualChats[bot.id].push(userEntry);
-  renderMsg(userEntry, 'homeBotLog', false);
+  renderMsg(userEntry, 'homeBotLog', false, 'bot', bot.id);
   botsHear([bot.id], text);
   const frags = tokenize(text);
   input.value = '';
   await delay(250 + Math.random()*400);
   const reply = generateReply(bot.vocab, frags);
-  const botEntry = { who:'bot', text:reply, botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, ts:nowHHMM() };
+  const botEntry = { who:'bot', text:reply, botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, ts:nowHHMM(), mid:uid() };
   individualChats[bot.id].push(botEntry);
-  renderMsg(botEntry, 'homeBotLog', false);
+  renderMsg(botEntry, 'homeBotLog', false, 'bot', bot.id);
   bot.lastMessage = reply; bot.lastTime = Date.now();
   botsHear([bot.id], reply);
+  if(Math.random() < 0.3){
+    if(!userEntry.reactions) userEntry.reactions = {};
+    userEntry.reactions[bot.id] = pick(REACTION_EMOJIS);
+    refreshReactionRow(userEntry);
+  }
   if(bot.ttsEnabled) speak(reply);
   if(individualChats[bot.id].length > MAX_LOG) individualChats[bot.id] = individualChats[bot.id].slice(individualChats[bot.id].length - MAX_LOG);
   await Promise.all([saveBots(), saveIndividualChats()]);
 }
 document.getElementById('homeBotSend').addEventListener('click', handleBotSend);
 document.getElementById('homeBotInput').addEventListener('keydown', e=>{ if(e.key==='Enter') handleBotSend(); });
+document.getElementById('homeBotReplyCancel').addEventListener('click', clearReplyTarget);
 
 /* ---- 人工無脳ごとの設定 ---- */
 function renderBotVocabList(bot){
@@ -1346,10 +1574,14 @@ function renderGroupEntry(entry, showName, groupId){
     addSystemNote('homeGroupLog', entry.text);
     return;
   }
-  const row = renderMsg(entry, 'homeGroupLog', showName);
+  const row = renderMsg(entry, 'homeGroupLog', showName, 'group', groupId);
   if(entry.who === 'bot' && likeDislikeEnabled){
     const col = row.querySelector('.col');
-    if(col) col.appendChild(renderVoteRow(entry, groupId));
+    const reactRow = col && col.querySelector('.reactrow');
+    if(col){
+      const voteRow = renderVoteRow(entry, groupId);
+      if(reactRow) col.insertBefore(voteRow, reactRow); else col.appendChild(voteRow);
+    }
   }
 }
 function renderGroupLogFromScratch(groupId){
@@ -1367,6 +1599,7 @@ function openGroupChat(id){
   currentGroupId = id;
   homeSubView = 'groupchat';
   showHomeSub('groupchat');
+  clearReplyTarget();
   renderGroupLogFromScratch(id);
   startGroupVoteTicker(id);
   updateHeaderChrome();
@@ -1463,7 +1696,9 @@ async function handleGroupSend(){
   if(memberBots.length === 0) return;
   const showName = memberBots.length > 1;
 
-  const userEntry = { who:'user', text, ts:nowHHMM() };
+  const userEntry = { who:'user', text, ts:nowHHMM(), mid:uid() };
+  if(replyTarget) userEntry.replyTo = { name:replyTarget.name, text:replyTarget.text };
+  clearReplyTarget();
   if(!groupChats[group.id]) groupChats[group.id] = [];
   groupChats[group.id].push(userEntry);
   renderGroupEntry(userEntry, showName, group.id);
@@ -1471,14 +1706,21 @@ async function handleGroupSend(){
   const frags = tokenize(text);
   input.value = '';
 
-  let responders = memberBots.length === 1 ? memberBots.slice() : memberBots.filter(()=>Math.random() < 0.65);
-  if(responders.length === 0) responders = [pick(memberBots)];
+  const mentioned = memberBots.filter(b => text.includes('@'+b.name));
+  let responders;
+  if(mentioned.length > 0){
+    responders = mentioned.slice();
+    memberBots.filter(b=>!mentioned.includes(b)).forEach(b=>{ if(Math.random() < 0.3) responders.push(b); });
+  } else {
+    responders = memberBots.length === 1 ? memberBots.slice() : memberBots.filter(()=>Math.random() < 0.65);
+    if(responders.length === 0) responders = [pick(memberBots)];
+  }
   responders = responders.slice().sort(()=>Math.random()-0.5);
 
   for(const bot of responders){
     await delay(250 + Math.random()*400);
     const reply = generateReply(bot.vocab, frags);
-    const botEntry = { who:'bot', text:reply, botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, ts:nowHHMM() };
+    const botEntry = { who:'bot', text:reply, botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, ts:nowHHMM(), mid:uid() };
     groupChats[group.id].push(botEntry);
     renderGroupEntry(botEntry, showName, group.id);
     bot.lastMessage = reply; bot.lastTime = Date.now();
@@ -1492,6 +1734,46 @@ async function handleGroupSend(){
 }
 document.getElementById('homeGroupSend').addEventListener('click', handleGroupSend);
 document.getElementById('homeGroupInput').addEventListener('keydown', e=>{ if(e.key==='Enter') handleGroupSend(); });
+document.getElementById('homeGroupReplyCancel').addEventListener('click', clearReplyTarget);
+
+/* ---- @メンション ---- */
+function setupMentionTrigger(inputId, getMembers){
+  const input = document.getElementById(inputId);
+  input.addEventListener('input', ()=>{
+    if(input.value.endsWith('@')){
+      const members = getMembers();
+      if(members.length > 0) showMentionPicker(inputId, members);
+    }
+  });
+}
+function showMentionPicker(inputId, members){
+  mentionActiveInputId = inputId;
+  const wrap = document.getElementById('mentionList');
+  wrap.innerHTML = '';
+  members.forEach(b=>{
+    const btn = document.createElement('button');
+    btn.className = 'glossy';
+    btn.style.cssText = 'display:block;width:100%;text-align:left;padding:10px;margin-top:6px;';
+    btn.textContent = b.name;
+    btn.addEventListener('click', ()=>{
+      const input = document.getElementById(mentionActiveInputId);
+      input.value = input.value.slice(0, -1) + '@' + b.name + ' ';
+      document.getElementById('mentionOverlay').classList.add('hidden');
+      input.focus();
+    });
+    wrap.appendChild(btn);
+  });
+  document.getElementById('mentionOverlay').classList.remove('hidden');
+}
+document.getElementById('mentionCancel').addEventListener('click', ()=>{
+  document.getElementById('mentionOverlay').classList.add('hidden');
+});
+setupMentionTrigger('homeBotInput', ()=> currentBotId ? [bots.find(b=>b.id===currentBotId)].filter(Boolean) : []);
+setupMentionTrigger('homeGroupInput', ()=>{
+  const group = groups.find(g=>g.id===currentGroupId);
+  if(!group) return [];
+  return bots.filter(b=>group.memberIds.includes(b.id));
+});
 
 /* ---- 新規作成（アクションシート） ---- */
 document.getElementById('asCancel').addEventListener('click', ()=>{
@@ -1761,10 +2043,13 @@ loadAll().then(()=>{
   applyTheme();
   applyBg();
   document.getElementById('likeDislikeToggle').checked = likeDislikeEnabled;
+  document.getElementById('versionFooter').textContent = `バージョン: ${APP_VERSION}`;
   addTimestamp('plazaLogEl');
   plazaLog.forEach(e=>renderPlazaMsg(e));
   setActiveTab('home');
   saveBots();
+  saveIndividualChats();
+  saveGroupChats();
 });
 
 if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
