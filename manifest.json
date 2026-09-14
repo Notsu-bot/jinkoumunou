@@ -1,0 +1,16 @@
+{
+  "name": "人工無脳",
+  "short_name": "人工無脳",
+  "description": "覚えた言葉をランダムに組み合わせて返す人工無脳アプリ",
+  "start_url": "./jinkoumunou.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#9099a1",
+  "theme_color": "#b6bcc2",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
