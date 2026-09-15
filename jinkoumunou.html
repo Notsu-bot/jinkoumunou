@@ -170,6 +170,15 @@
 
   .versionfooter{ text-align:center; font-size:11px; color:var(--dim); padding:16px 0 4px; }
 
+  .profilewrap{ flex:1; overflow-y:auto; background:var(--sheet-bg); }
+  .profilebanner{ height:130px; background-size:cover; background-position:center; background-color:#8a8f95; }
+  .profileavatarwrap{ display:flex; justify-content:center; margin-top:-42px; }
+  .profileavatar{ width:84px; height:84px; font-size:30px; border:4px solid var(--sheet-bg); }
+  .profilename{ text-align:center; font-size:18px; font-weight:700; margin-top:10px; }
+  .profilestatus{ text-align:center; font-size:13px; color:var(--dim); margin-top:6px; padding:0 24px; }
+  .profileactions{ display:flex; gap:10px; justify-content:center; margin-top:22px; padding:0 20px; }
+  .profileactions button{ flex:1; max-width:140px; padding:10px; }
+
   .inputbar{
     display:flex; align-items:center; gap:8px; padding:8px 10px; flex-shrink:0;
     background:linear-gradient(to bottom, var(--tab-top) 0%, var(--tab-bottom) 100%);
@@ -281,6 +290,21 @@
 
   <div class="tabpanel" id="panel-home">
     <div class="listwrap" id="homeListWrap"></div>
+
+    <div class="panel hidden" id="homeBotProfile">
+      <div class="profilewrap">
+        <div class="profilebanner" id="profileBanner"></div>
+        <div class="profileavatarwrap">
+          <div class="avatar profileavatar" id="profileAvatar"></div>
+        </div>
+        <div class="profilename" id="profileName"></div>
+        <div class="profilestatus" id="profileStatus"></div>
+        <div class="profileactions">
+          <button class="glossy" id="profileOpenChatBtn">トークを開く</button>
+          <button class="glossy" id="profileOpenSettingsBtn">設定</button>
+        </div>
+      </div>
+    </div>
 
     <div class="panel hidden" id="homeBotChat">
       <div class="log" id="homeBotLog"></div>
@@ -1053,6 +1077,10 @@ function renderHeaderFor(tab){
       const b = bots.find(x=>x.id===currentBotId);
       titleEl.textContent = b ? b.name : 'チャット';
       subEl.textContent = b ? `語彙: ${(b.vocab||[]).length}断片` : '';
+    } else if(homeSubView === 'botprofile'){
+      const b = bots.find(x=>x.id===currentBotId);
+      titleEl.textContent = b ? b.name : 'プロフィール';
+      subEl.textContent = '';
     } else if(homeSubView === 'botsettings'){
       const b = bots.find(x=>x.id===currentBotId);
       titleEl.textContent = b ? `${b.name} の設定` : '設定';
@@ -1104,6 +1132,9 @@ function updateHeaderChrome(){
       left.onclick = ()=> goHomeList();
       right.textContent = '⚙'; right.classList.remove('invisible');
       right.onclick = ()=> openBotSettings(currentBotId);
+    } else if(homeSubView === 'botprofile'){
+      left.textContent = '戻る'; left.classList.add('back'); left.classList.remove('invisible');
+      left.onclick = ()=> goHomeList();
     } else if(homeSubView === 'botsettings'){
       left.textContent = '戻る'; left.classList.add('back'); left.classList.remove('invisible');
       left.onclick = ()=> openBotChat(currentBotId);
@@ -1132,7 +1163,7 @@ function updateHeaderChrome(){
 
 /* ---- タブ切替 ---- */
 function showHomeSub(view){
-  const map = { list:'homeListWrap', botchat:'homeBotChat', botsettings:'homeBotSettings', groupchat:'homeGroupChat', groupsettings:'homeGroupSettings', newgroup:'homeNewGroup', newbot:'homeNewBot' };
+  const map = { list:'homeListWrap', botchat:'homeBotChat', botprofile:'homeBotProfile', botsettings:'homeBotSettings', groupchat:'homeGroupChat', groupsettings:'homeGroupSettings', newgroup:'homeNewGroup', newbot:'homeNewBot' };
   Object.values(map).forEach(id=> document.getElementById(id).classList.add('hidden'));
   document.getElementById(map[view]).classList.remove('hidden');
 }
@@ -1390,6 +1421,13 @@ function renderHomeList(){
     }
     const avatarDiv = avatarEl(ent.name, ent.color, ent.avatar);
     avatarDiv.classList.add('big');
+    if(!homeEditMode && ent.type === 'bot'){
+      avatarDiv.style.cursor = 'pointer';
+      avatarDiv.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        openBotProfile(ent.id);
+      });
+    }
     row.appendChild(avatarDiv);
     const info = document.createElement('div');
     info.className = 'listinfo';
@@ -1404,6 +1442,34 @@ function renderHomeList(){
     wrap.appendChild(row);
   });
 }
+
+/* ---- プロフィール画面 ---- */
+function openBotProfile(id){
+  currentBotId = id;
+  homeSubView = 'botprofile';
+  showHomeSub('botprofile');
+  const bot = bots.find(b=>b.id===id);
+  if(!bot){ updateHeaderChrome(); renderHeaderFor('home'); return; }
+  document.getElementById('profileBanner').style.backgroundImage = bot.bg ? `url(${bot.bg})` : '';
+  const av = document.getElementById('profileAvatar');
+  av.style.background = '';
+  av.innerHTML = '';
+  if(bot.avatar){
+    const img = document.createElement('img');
+    img.src = bot.avatar; img.style.width='100%'; img.style.height='100%'; img.style.objectFit='cover';
+    av.appendChild(img);
+  } else {
+    av.style.background = bot.color || '#9aa0a6';
+    av.innerHTML = PERSON_SVG;
+  }
+  document.getElementById('profileName').textContent = bot.name;
+  const vocab = bot.vocab || [];
+  document.getElementById('profileStatus').textContent = vocab.length > 0 ? pick(vocab) : 'まだ何も学習していません';
+  updateHeaderChrome();
+  renderHeaderFor('home');
+}
+document.getElementById('profileOpenChatBtn').addEventListener('click', ()=> openBotChat(currentBotId));
+document.getElementById('profileOpenSettingsBtn').addEventListener('click', ()=> openBotSettings(currentBotId));
 
 /* ---- 個人チャット ---- */
 function openBotChat(id){
@@ -1836,10 +1902,10 @@ document.getElementById('newGroupAvatarFile').addEventListener('change', e=>{
   openCropper(file, (dataUrl)=>{
     newGroupAvatarData = dataUrl;
     const pv = document.getElementById('newGroupAvatarPreview');
-    pv.style.backgroundImage = `url(${newGroupAvatarData})`;
-    pv.style.backgroundSize = 'cover'; pv.style.backgroundPosition = 'center';
     pv.style.background = '';
     pv.innerHTML = '';
+    pv.style.backgroundImage = `url(${newGroupAvatarData})`;
+    pv.style.backgroundSize = 'cover'; pv.style.backgroundPosition = 'center';
   });
 });
 document.getElementById('newGroupBgFile').addEventListener('change', async e=>{
@@ -1863,10 +1929,10 @@ document.getElementById('newBotAvatarFile').addEventListener('change', e=>{
   openCropper(file, (dataUrl)=>{
     newBotAvatarData = dataUrl;
     const pv = document.getElementById('newBotAvatarPreview');
-    pv.style.backgroundImage = `url(${newBotAvatarData})`;
-    pv.style.backgroundSize = 'cover'; pv.style.backgroundPosition = 'center';
     pv.style.background = '';
     pv.innerHTML = '';
+    pv.style.backgroundImage = `url(${newBotAvatarData})`;
+    pv.style.backgroundSize = 'cover'; pv.style.backgroundPosition = 'center';
   });
 });
 document.getElementById('newBotBgFile').addEventListener('change', async e=>{
