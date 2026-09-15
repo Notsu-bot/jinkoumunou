@@ -184,6 +184,24 @@
   .profileactions{ display:flex; gap:10px; justify-content:center; margin-top:22px; padding:0 20px; }
   .profileactions button{ flex:1; max-width:140px; padding:10px; }
 
+  .notifbar{ background:linear-gradient(to bottom,#fff6c9,#f3dd8a); border-bottom:1px solid var(--border); padding:8px 12px; font-size:13px; text-align:center; cursor:pointer; color:#5a4a10; }
+  .composebox{ padding:14px 16px 4px; }
+  .composebox textarea{ resize:vertical; font-family:inherit; }
+  .postcard{ background:var(--phone-bg); margin:0 12px 14px; border-radius:10px; padding:10px 12px; border:1px solid var(--border); box-shadow:0 1px 2px rgba(0,0,0,.15); }
+  .postheader{ display:flex; align-items:center; gap:8px; }
+  .postheader .avatar{ width:28px; height:28px; font-size:12px; }
+  .postheader .pname{ font-weight:700; font-size:13px; }
+  .postheader .ptime{ font-size:11px; color:var(--dim); margin-left:auto; }
+  .posttext{ margin:8px 0; font-size:14px; white-space:pre-wrap; word-break:break-word; }
+  .commentitem{ display:flex; gap:6px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+  .commentitem .avatar{ width:24px; height:24px; font-size:11px; flex-shrink:0; }
+  .commentwrap{ flex:1; min-width:0; }
+  .commentname{ font-size:11px; font-weight:700; color:var(--dim); }
+  .commentbubble{ background:var(--input-bg); border-radius:10px; padding:6px 10px; font-size:13px; margin-top:2px; word-break:break-word; }
+  .commentinputrow{ display:flex; gap:6px; margin-top:10px; }
+  .commentinputrow input{ flex:1; padding:7px 10px; font-size:13px; }
+  .commentinputrow button{ padding:7px 10px; font-size:13px; }
+
   .inputbar{
     display:flex; align-items:center; gap:8px; padding:8px 10px; flex-shrink:0;
     background:linear-gradient(to bottom, var(--tab-top) 0%, var(--tab-bottom) 100%);
@@ -294,6 +312,7 @@
   </div>
 
   <div class="tabpanel" id="panel-home">
+    <div class="notifbar hidden" id="notifBar">🔔 <span id="notifCount"></span> 件の通知</div>
     <div class="listwrap" id="homeListWrap"></div>
 
     <div class="panel hidden" id="homeBotProfile">
@@ -488,6 +507,16 @@
   <div class="tabpanel hidden" id="panel-settings">
     <div class="settingswrap">
       <div class="section">
+        <div class="section-title">プロフィール</div>
+        <input type="text" id="myNameInput" class="forminput" placeholder="名前">
+        <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
+          <div class="avatar big" id="mySettingsAvatarPreview"></div>
+          <label class="glossy" style="padding:8px 12px;">アイコンを選ぶ<input type="file" id="mySettingsAvatarFile" accept="image/*" style="display:none;"></label>
+        </div>
+        <div class="bgpreview" id="mySettingsHeaderPreview" style="margin-top:10px;"></div>
+        <div class="filerow"><label class="glossy">ヘッダー画像を選ぶ<input type="file" id="mySettingsHeaderFile" accept="image/*"></label></div>
+      </div>
+      <div class="section">
         <div class="section-title">表示</div>
         <div class="switchrow">
           <span>ダークモード</span>
@@ -516,10 +545,32 @@
     </div>
   </div>
 
+  <div class="tabpanel hidden" id="panel-profile">
+    <div class="profilewrap" id="profileFeedWrap">
+      <div class="profilebanner" id="myProfileBanner"></div>
+      <div class="profileavatarwrap"><div class="avatar profileavatar" id="myProfileAvatar"></div></div>
+      <div class="profilename" id="myProfileName"></div>
+      <div class="composebox">
+        <textarea id="postInput" class="forminput" rows="2" placeholder="いまどうしてる？"></textarea>
+        <button class="glossy" id="postSubmitBtn" style="margin-top:6px; width:100%;">投稿</button>
+      </div>
+      <div id="postsFeed"></div>
+    </div>
+  </div>
+
   <div class="tabbar">
     <button class="tabbtn active" data-tab="home"><span class="icon">🏠</span>ホーム</button>
     <button class="tabbtn" data-tab="plaza"><span class="icon">🌐</span>ひろば</button>
+    <button class="tabbtn" data-tab="profile"><span class="icon">👤</span>プロフィール</button>
     <button class="tabbtn" data-tab="settings"><span class="icon">⚙️</span>設定</button>
+  </div>
+
+  <div class="sheetOverlay hidden" id="notifOverlay">
+    <div class="actionSheet" style="max-height:65vh; overflow-y:auto;">
+      <div class="section-title">通知</div>
+      <div id="notifList"></div>
+      <button class="glossy" id="notifCloseBtn">閉じる</button>
+    </div>
   </div>
 
   <div class="sheetOverlay hidden" id="actionSheetOverlay">
@@ -612,6 +663,11 @@ let plazaTimer = null;
 let replyTarget = null;   // { mid, name, text } - 返信中のメッセージ
 let reactionTarget = null; // { entry, contextType, contextId } - リアクション選択中
 let mentionActiveInputId = null;
+let profileReturnTo = null;
+let userName = 'あなた';
+let userHeader = null;
+let posts = [];
+let notifications = [];
 
 function uid(){ try{ return crypto.randomUUID(); }catch(e){ return 'x'+Date.now()+Math.floor(Math.random()*1000); } }
 function randomColor(){ return PALETTE[Math.floor(Math.random()*PALETTE.length)]; }
@@ -1153,6 +1209,9 @@ function renderHeaderFor(tab){
       titleEl.textContent = 'ひろば';
       subEl.textContent = plazaEnabled ? `${plazaEligibleBots().length}体が発言中` : '停止中';
     }
+  } else if(tab === 'profile'){
+    titleEl.textContent = 'プロフィール';
+    subEl.textContent = `投稿 ${posts.length}件`;
   } else if(tab === 'settings'){
     titleEl.textContent = '設定'; subEl.textContent = '';
   }
@@ -1179,7 +1238,10 @@ function updateHeaderChrome(){
       right.onclick = ()=> openBotSettings(currentBotId);
     } else if(homeSubView === 'botprofile'){
       left.textContent = '戻る'; left.classList.add('back'); left.classList.remove('invisible');
-      left.onclick = ()=> goHomeList();
+      left.onclick = ()=>{
+        if(profileReturnTo && profileReturnTo.type === 'group') openGroupChat(profileReturnTo.id);
+        else goHomeList();
+      };
     } else if(homeSubView === 'botsettings'){
       left.textContent = '戻る'; left.classList.add('back'); left.classList.remove('invisible');
       left.onclick = ()=> openBotChat(currentBotId);
@@ -1235,6 +1297,9 @@ function setActiveTab(tab){
     showHomeSub(homeSubView);
     if(homeSubView === 'list') renderHomeList();
   }
+  if(tab === 'profile'){
+    renderProfileFeed();
+  }
   updateHeaderChrome();
   renderHeaderFor(tab);
 }
@@ -1259,13 +1324,15 @@ async function saveBg(){
     else{ await storageDelete('jinkoumunou-bg', false); }
   }catch(e){ console.error(e); }
 }
+async function savePosts(){ try{ await storageSet('jinkoumunou-posts', JSON.stringify(posts), false); }catch(e){ console.error(e); } }
+async function saveNotifications(){ try{ await storageSet('jinkoumunou-notifications', JSON.stringify(notifications), false); }catch(e){ console.error(e); } }
 function trimAndSavePlaza(){ if(plazaLog.length > MAX_LOG) plazaLog = plazaLog.slice(plazaLog.length - MAX_LOG); savePlazaLog(); }
 
 async function loadAll(){
   try{ const r = await storageGet('jinkoumunou-bots', false); if(r && r.value) bots = JSON.parse(r.value); }catch(e){}
-  bots.forEach(b=>{ if(!b.vocab) b.vocab = []; if(b.bg === undefined) b.bg = null; if(b.ttsEnabled === undefined) b.ttsEnabled=false; if(b.learningPaused===undefined) b.learningPaused=false; b.vocab = capFragmentFrequency(b.vocab.filter(isMeaningfulFragment), 5); });
+  bots.forEach(b=>{ if(!b.vocab) b.vocab = []; if(b.bg === undefined) b.bg = null; if(b.ttsEnabled === undefined) b.ttsEnabled=false; if(b.learningPaused===undefined) b.learningPaused=false; if(b.pinned===undefined) b.pinned=false; b.vocab = capFragmentFrequency(b.vocab.filter(isMeaningfulFragment), 5); });
   try{ const r = await storageGet('jinkoumunou-groups', false); if(r && r.value) groups = JSON.parse(r.value); }catch(e){}
-  groups.forEach(g=>{ if(!g.memberIds) g.memberIds = []; if(g.bg === undefined) g.bg = null; if(g.avatar === undefined) g.avatar = null; });
+  groups.forEach(g=>{ if(!g.memberIds) g.memberIds = []; if(g.bg === undefined) g.bg = null; if(g.avatar === undefined) g.avatar = null; if(g.pinned===undefined) g.pinned=false; });
   try{ const r = await storageGet('jinkoumunou-individual-chats', false); if(r && r.value) individualChats = JSON.parse(r.value); }catch(e){}
   try{ const r = await storageGet('jinkoumunou-group-chats', false); if(r && r.value) groupChats = JSON.parse(r.value); }catch(e){}
   Object.values(individualChats).forEach(arr=>{ (arr||[]).forEach(e=>{ if(!e.mid) e.mid = uid(); }); });
@@ -1274,6 +1341,11 @@ async function loadAll(){
   try{ const r = await storageGet('jinkoumunou-theme', false); if(r && r.value) theme = r.value; }catch(e){}
   try{ const r = await storageGet('jinkoumunou-bg', false); if(r && r.value) bgImage = r.value; }catch(e){}
   try{ const r = await storageGet('jinkoumunou-user-avatar', false); if(r && r.value) userAvatar = r.value; }catch(e){}
+  try{ const r = await storageGet('jinkoumunou-user-name', false); if(r && r.value) userName = r.value; }catch(e){}
+  try{ const r = await storageGet('jinkoumunou-user-header', false); if(r && r.value) userHeader = r.value; }catch(e){}
+  try{ const r = await storageGet('jinkoumunou-posts', false); if(r && r.value) posts = JSON.parse(r.value); }catch(e){}
+  posts.forEach(p=>{ if(!p.votes) p.votes = { voters:{} }; if(!p.comments) p.comments = []; p.comments.forEach(c=>{ if(!c.votes) c.votes = { voters:{} }; }); });
+  try{ const r = await storageGet('jinkoumunou-notifications', false); if(r && r.value) notifications = JSON.parse(r.value); }catch(e){}
   try{ const r = await storageGet('jinkoumunou-likedislike-enabled', false); if(r && r.value) likeDislikeEnabled = r.value==='true'; }catch(e){}
   try{ const r = await storageGet('jinkoumunou-plaza-enabled', false); if(r && r.value) plazaEnabled = r.value==='true'; }catch(e){}
   try{ const r = await storageGet('jinkoumunou-plaza-participants', false); if(r && r.value) plazaParticipantIds = JSON.parse(r.value); }catch(e){}
@@ -1420,13 +1492,44 @@ function updateCropperTransform(){
 })();
 
 /* ---- ホーム一覧 ---- */
+function attachLongPress(el, onLongPress, onClick){
+  let timer = null;
+  let longPressed = false;
+  el.addEventListener('pointerdown', ()=>{
+    longPressed = false;
+    timer = setTimeout(()=>{ longPressed = true; onLongPress(); }, 550);
+  });
+  const clear = ()=>{ if(timer){ clearTimeout(timer); timer = null; } };
+  el.addEventListener('pointerup', clear);
+  el.addEventListener('pointercancel', clear);
+  el.addEventListener('pointerleave', clear);
+  el.addEventListener('click', (e)=>{
+    if(longPressed){ longPressed = false; e.preventDefault(); e.stopPropagation(); return; }
+    onClick(e);
+  });
+}
+async function togglePin(ent){
+  ent.ref.pinned = !ent.ref.pinned;
+  if(ent.type === 'bot') await saveBots(); else await saveGroups();
+  renderHomeList();
+}
 function renderHomeList(){
   const wrap = document.getElementById('homeListWrap');
   wrap.innerHTML = '';
   const entries = [
-    ...bots.map(b=>({type:'bot', id:b.id, name:b.name, color:b.color, avatar:b.avatar, preview:b.lastMessage, lastTime:b.lastTime||0, ref:b})),
-    ...groups.map(g=>({type:'group', id:g.id, name:g.name, color:g.color||'#8a8f95', avatar:null, preview:g.lastMessage, lastTime:g.lastTime||0, ref:g}))
-  ].sort((a,b)=>b.lastTime - a.lastTime);
+    ...bots.map(b=>{
+      const hist = individualChats[b.id] || [];
+      const last = hist.length > 0 ? hist[hist.length-1] : null;
+      return { type:'bot', id:b.id, name:b.name, color:b.color, avatar:b.avatar,
+        preview: last ? (last.kind==='image' ? '(写真)' : last.text) : null,
+        lastTime: last ? (last.ts||0) : 0, pinned: !!b.pinned, ref:b };
+    }),
+    ...groups.map(g=>({ type:'group', id:g.id, name:g.name, color:g.color||'#8a8f95', avatar:g.avatar||null,
+      preview:g.lastMessage, lastTime:g.lastTime||0, pinned: !!g.pinned, ref:g }))
+  ].sort((a,b)=>{
+    if(a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return b.lastTime - a.lastTime;
+  });
 
   if(entries.length === 0){
     const empty = document.createElement('div');
@@ -1439,6 +1542,8 @@ function renderHomeList(){
   entries.forEach(ent=>{
     const row = document.createElement('div');
     row.className = 'listrow';
+    const avatarDiv = avatarEl(ent.name, ent.color, ent.avatar);
+    avatarDiv.classList.add('big');
     if(homeEditMode){
       const del = document.createElement('button');
       del.className = 'delbadge';
@@ -1459,26 +1564,24 @@ function renderHomeList(){
         renderHeaderFor('home');
       });
       row.appendChild(del);
+      row.appendChild(avatarDiv);
     } else {
-      row.addEventListener('click', ()=>{
-        if(ent.type === 'bot') openBotChat(ent.id); else openGroupChat(ent.id);
+      attachLongPress(row, ()=> togglePin(ent), (e)=>{
+        if(ent.type === 'bot' && avatarDiv.contains(e.target)){
+          openBotProfile(ent.id);
+        } else if(ent.type === 'bot'){
+          openBotChat(ent.id);
+        } else {
+          openGroupChat(ent.id);
+        }
       });
+      row.appendChild(avatarDiv);
     }
-    const avatarDiv = avatarEl(ent.name, ent.color, ent.avatar);
-    avatarDiv.classList.add('big');
-    if(!homeEditMode && ent.type === 'bot'){
-      avatarDiv.style.cursor = 'pointer';
-      avatarDiv.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        openBotProfile(ent.id);
-      });
-    }
-    row.appendChild(avatarDiv);
     const info = document.createElement('div');
     info.className = 'listinfo';
     const nameEl = document.createElement('div');
     nameEl.className = 'listname';
-    nameEl.textContent = ent.name + (ent.type === 'group' ? `（${ent.ref.memberIds.length}）` : '');
+    nameEl.textContent = (ent.pinned ? '📌 ' : '') + ent.name + (ent.type === 'group' ? `（${ent.ref.memberIds.length}）` : '');
     const preview = document.createElement('div');
     preview.className = 'listpreview';
     preview.textContent = ent.preview ? ent.preview : (ent.type === 'group' ? 'グループを作成しました' : 'まだ発言していません');
@@ -1489,8 +1592,9 @@ function renderHomeList(){
 }
 
 /* ---- プロフィール画面 ---- */
-function openBotProfile(id){
+function openBotProfile(id, returnTo){
   currentBotId = id;
+  profileReturnTo = returnTo || null;
   homeSubView = 'botprofile';
   showHomeSub('botprofile');
   const bot = bots.find(b=>b.id===id);
@@ -2170,6 +2274,248 @@ document.getElementById('plazaClearLogBtn').addEventListener('click', async ()=>
   await savePlazaLog();
 });
 
+/* ---- プロフィール(投稿) ---- */
+function renderSimpleVoteRow(entry, onVote){
+  const row = document.createElement('div');
+  row.className = 'voterow';
+  row.dataset.mid = entry.id;
+  const upBtn = document.createElement('button'); upBtn.type = 'button';
+  const downBtn = document.createElement('button'); downBtn.type = 'button';
+  upBtn.addEventListener('click', ()=> onVote(entry, 'up'));
+  downBtn.addEventListener('click', ()=> onVote(entry, 'down'));
+  row.appendChild(upBtn); row.appendChild(downBtn);
+  paintVoteRowGeneric(row, entry);
+  return row;
+}
+function paintVoteRowGeneric(row, entry){
+  const { up, down } = computeVotes(entry);
+  const myVote = entry.votes && entry.votes.voters && entry.votes.voters['user'];
+  const upBtn = row.children[0], downBtn = row.children[1];
+  upBtn.className = 'votebtn' + (myVote==='up' ? ' active' : '');
+  downBtn.className = 'votebtn' + (myVote==='down' ? ' active' : '');
+  upBtn.innerHTML = THUMB_UP_SVG + `<span>${up}</span>`;
+  downBtn.innerHTML = THUMB_DOWN_SVG + `<span>${down}</span>`;
+}
+async function castProfileVote(entry, choice){
+  if(!entry.votes) entry.votes = { voters:{} };
+  if(entry.votes.voters['user'] === choice) delete entry.votes.voters['user'];
+  else entry.votes.voters['user'] = choice;
+  await savePosts();
+  const row = document.querySelector(`.voterow[data-mid="${entry.id}"]`);
+  if(row) paintVoteRowGeneric(row, entry);
+}
+function addNotification(n){
+  n.id = uid(); n.read = false;
+  notifications.unshift(n);
+  if(notifications.length > 100) notifications = notifications.slice(0, 100);
+  saveNotifications();
+  updateNotifBar();
+}
+function updateNotifBar(){
+  const bar = document.getElementById('notifBar');
+  if(!bar) return;
+  const unread = notifications.filter(n=>!n.read).length;
+  if(unread > 0){ bar.classList.remove('hidden'); document.getElementById('notifCount').textContent = unread; }
+  else bar.classList.add('hidden');
+}
+function renderNotifList(){
+  const wrap = document.getElementById('notifList');
+  wrap.innerHTML = '';
+  if(notifications.length === 0){
+    wrap.innerHTML = '<div class="listpreview">通知はありません。</div>';
+    return;
+  }
+  notifications.forEach(n=>{
+    const row = document.createElement('div');
+    row.className = 'listrow';
+    const info = document.createElement('div');
+    info.className = 'listinfo';
+    const t1 = document.createElement('div');
+    t1.className = 'listname';
+    t1.textContent = n.type === 'vote' ? `${n.botName} があなたの投稿に${n.text}` : `${n.botName}: ${n.text}`;
+    const t2 = document.createElement('div');
+    t2.className = 'listpreview'; t2.textContent = formatTime(n.ts);
+    info.appendChild(t1); info.appendChild(t2);
+    row.appendChild(info);
+    row.addEventListener('click', ()=>{
+      n.read = true;
+      saveNotifications();
+      document.getElementById('notifOverlay').classList.add('hidden');
+      updateNotifBar();
+      const tabBtn = document.querySelector('.tabbtn[data-tab="profile"]');
+      if(tabBtn) tabBtn.click();
+      setTimeout(()=>{
+        const el = document.getElementById('post-'+n.postId);
+        if(el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+      }, 60);
+    });
+    wrap.appendChild(row);
+  });
+}
+document.getElementById('notifBar').addEventListener('click', ()=>{
+  renderNotifList();
+  document.getElementById('notifOverlay').classList.remove('hidden');
+});
+document.getElementById('notifCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('notifOverlay').classList.add('hidden');
+});
+
+function renderMySettingsAvatarPreview(){
+  const pv = document.getElementById('mySettingsAvatarPreview');
+  if(!pv) return;
+  pv.innerHTML = ''; pv.style.background = '';
+  if(userAvatar){
+    const img = document.createElement('img');
+    img.src = userAvatar; img.style.width='100%'; img.style.height='100%'; img.style.objectFit='cover';
+    pv.appendChild(img);
+  } else {
+    pv.style.background = '#4fbf67';
+    pv.innerHTML = PERSON_SVG;
+  }
+}
+function renderProfileFeed(){
+  document.getElementById('myProfileBanner').style.backgroundImage = userHeader ? `url(${userHeader})` : '';
+  const av = document.getElementById('myProfileAvatar');
+  av.innerHTML = ''; av.style.background = '';
+  if(userAvatar){
+    const img = document.createElement('img');
+    img.src = userAvatar; img.style.width='100%'; img.style.height='100%'; img.style.objectFit='cover';
+    av.appendChild(img);
+  } else {
+    av.style.background = '#4fbf67';
+    av.innerHTML = PERSON_SVG;
+  }
+  document.getElementById('myProfileName').textContent = userName || 'あなた';
+
+  const wrap = document.getElementById('postsFeed');
+  wrap.innerHTML = '';
+  if(posts.length === 0){
+    const p = document.createElement('div');
+    p.className = 'listpreview'; p.style.padding = '16px'; p.textContent = 'まだ投稿がありません。';
+    wrap.appendChild(p);
+    return;
+  }
+  posts.slice().reverse().forEach(post=>{
+    const card = document.createElement('div');
+    card.className = 'postcard';
+    card.id = 'post-' + post.id;
+    const header = document.createElement('div'); header.className = 'postheader';
+    header.appendChild(avatarEl(userName, '#4fbf67', userAvatar));
+    const nm = document.createElement('span'); nm.className = 'pname'; nm.textContent = userName || 'あなた';
+    const tm = document.createElement('span'); tm.className = 'ptime'; tm.textContent = formatTime(post.ts);
+    header.appendChild(nm); header.appendChild(tm);
+    card.appendChild(header);
+    const txt = document.createElement('div'); txt.className = 'posttext'; txt.textContent = post.text;
+    card.appendChild(txt);
+    card.appendChild(renderSimpleVoteRow(post, castProfileVote));
+    (post.comments || []).forEach(c=>{
+      const ci = document.createElement('div'); ci.className = 'commentitem';
+      ci.appendChild(c.who === 'bot' ? avatarEl(c.botName, c.botColor, c.botAvatar) : avatarEl(userName, '#4fbf67', userAvatar));
+      const cwrap = document.createElement('div'); cwrap.className = 'commentwrap';
+      const cname = document.createElement('div'); cname.className = 'commentname';
+      cname.textContent = c.who === 'bot' ? c.botName : (userName || 'あなた');
+      const cbubble = document.createElement('div'); cbubble.className = 'commentbubble'; cbubble.textContent = c.text;
+      cwrap.appendChild(cname); cwrap.appendChild(cbubble);
+      cwrap.appendChild(renderSimpleVoteRow(c, castProfileVote));
+      ci.appendChild(cwrap);
+      card.appendChild(ci);
+    });
+    const inputRow = document.createElement('div'); inputRow.className = 'commentinputrow';
+    const cinput = document.createElement('input');
+    cinput.type = 'text'; cinput.className = 'forminput'; cinput.placeholder = 'コメントする…';
+    const csend = document.createElement('button'); csend.className = 'glossy'; csend.textContent = '送信';
+    csend.addEventListener('click', ()=>{
+      const v = cinput.value.trim(); if(!v) return;
+      cinput.value = '';
+      addUserComment(post, v);
+    });
+    cinput.addEventListener('keydown', e=>{ if(e.key === 'Enter') csend.click(); });
+    inputRow.appendChild(cinput); inputRow.appendChild(csend);
+    card.appendChild(inputRow);
+    wrap.appendChild(card);
+  });
+}
+async function engageBotsWithPost(post){
+  for(const bot of bots){
+    if(Math.random() < 0.5){
+      await delay(300 + Math.random()*600);
+      const choice = Math.random() < 0.5 ? 'up' : 'down';
+      if(!post.votes) post.votes = { voters:{} };
+      post.votes.voters[bot.id] = choice;
+      addNotification({ type:'vote', postId:post.id, botId:bot.id, botName:bot.name, text: choice==='up' ? '高評価をつけました' : '低評価をつけました', ts:Date.now() });
+      await savePosts();
+      renderProfileFeed();
+    }
+    if(Math.random() < 0.25){
+      await delay(300 + Math.random()*600);
+      const frags = tokenize(post.text);
+      const commentText = generateReply(bot.vocab, frags);
+      const comment = { id:uid(), who:'bot', botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, text:commentText, ts:Date.now(), votes:{voters:{}} };
+      post.comments.push(comment);
+      botsHear([bot.id], commentText);
+      addNotification({ type:'comment', postId:post.id, commentId:comment.id, botId:bot.id, botName:bot.name, text:commentText, ts:Date.now() });
+      await Promise.all([savePosts(), saveBots()]);
+      renderProfileFeed();
+    }
+  }
+}
+async function addUserComment(post, text){
+  const comment = { id:uid(), who:'user', text, ts:Date.now(), votes:{voters:{}} };
+  post.comments.push(comment);
+  botsHear(bots.map(b=>b.id), text);
+  await Promise.all([savePosts(), saveBots()]);
+  renderProfileFeed();
+  for(const bot of bots){
+    if(Math.random() < 0.4){
+      await delay(300 + Math.random()*600);
+      const frags = tokenize(text);
+      const reply = generateReply(bot.vocab, frags);
+      const botComment = { id:uid(), who:'bot', botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, text:reply, ts:Date.now(), votes:{voters:{}} };
+      post.comments.push(botComment);
+      botsHear([bot.id], reply);
+      addNotification({ type:'comment', postId:post.id, commentId:botComment.id, botId:bot.id, botName:bot.name, text:reply, ts:Date.now() });
+      await Promise.all([savePosts(), saveBots()]);
+      renderProfileFeed();
+    }
+  }
+}
+document.getElementById('postSubmitBtn').addEventListener('click', async ()=>{
+  const ta = document.getElementById('postInput');
+  const text = ta.value.trim();
+  if(!text) return;
+  ta.value = '';
+  const post = { id:uid(), text, ts:Date.now(), votes:{voters:{}}, comments:[] };
+  posts.push(post);
+  botsHear(bots.map(b=>b.id), text);
+  await Promise.all([savePosts(), saveBots()]);
+  renderProfileFeed();
+  await engageBotsWithPost(post);
+});
+document.getElementById('myNameInput').addEventListener('change', async e=>{
+  userName = e.target.value.trim() || 'あなた';
+  await storageSet('jinkoumunou-user-name', userName, false);
+  renderProfileFeed();
+});
+document.getElementById('mySettingsAvatarFile').addEventListener('change', e=>{
+  const file = e.target.files[0]; if(!file) return;
+  e.target.value = '';
+  openCropper(file, async (dataUrl)=>{
+    userAvatar = dataUrl;
+    await storageSet('jinkoumunou-user-avatar', userAvatar, false);
+    renderMySettingsAvatarPreview();
+    renderProfileFeed();
+  });
+});
+document.getElementById('mySettingsHeaderFile').addEventListener('change', async e=>{
+  const file = e.target.files[0]; if(!file) return;
+  try{
+    userHeader = await resizeImage(file, 900, 0.8);
+    document.getElementById('mySettingsHeaderPreview').style.backgroundImage = `url(${userHeader})`;
+    await storageSet('jinkoumunou-user-header', userHeader, false);
+    renderProfileFeed();
+  }catch(err){ console.error(err); }
+});
+
 /* ---- 設定タブ ---- */
 document.getElementById('themeToggle').addEventListener('change', e=>{
   theme = e.target.checked ? 'dark' : 'light';
@@ -2235,6 +2581,10 @@ loadAll().then(()=>{
   applyBg();
   document.getElementById('likeDislikeToggle').checked = likeDislikeEnabled;
   document.getElementById('versionFooter').textContent = `バージョン: ${APP_VERSION}`;
+  document.getElementById('myNameInput').value = userName;
+  renderMySettingsAvatarPreview();
+  document.getElementById('mySettingsHeaderPreview').style.backgroundImage = userHeader ? `url(${userHeader})` : '';
+  updateNotifBar();
   addTimestamp('plazaLogEl');
   plazaLog.forEach(e=>renderPlazaMsg(e));
   setActiveTab('home');
