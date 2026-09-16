@@ -1229,6 +1229,8 @@ function renderHeaderFor(tab){
       const b = bots.find(x=>x.id===currentBotId);
       titleEl.textContent = b ? b.name : 'チャット';
       subEl.textContent = b ? `語彙: ${(b.vocab||[]).length}断片` : '';
+    } else if(homeSubView === 'notifications'){
+      titleEl.textContent = '通知'; subEl.textContent = '';
     } else if(homeSubView === 'botprofile'){
       const b = bots.find(x=>x.id===currentBotId);
       titleEl.textContent = b ? b.name : 'プロフィール';
@@ -1287,6 +1289,9 @@ function updateHeaderChrome(){
       left.onclick = ()=> goHomeList();
       right.textContent = '⚙'; right.classList.remove('invisible');
       right.onclick = ()=> openBotSettings(currentBotId);
+    } else if(homeSubView === 'notifications'){
+      left.textContent = '戻る'; left.classList.add('back'); left.classList.remove('invisible');
+      left.onclick = ()=> goHomeList();
     } else if(homeSubView === 'botprofile'){
       left.textContent = '戻る'; left.classList.add('back'); left.classList.remove('invisible');
       left.onclick = ()=>{
@@ -2528,7 +2533,6 @@ function renderNotifList(){
     row.addEventListener('click', ()=>{
       n.read = true;
       saveNotifications();
-      document.getElementById('notifOverlay').classList.add('hidden');
       updateNotifBar();
       const tabBtn = document.querySelector('.tabbtn[data-tab="profile"]');
       if(tabBtn) tabBtn.click();
@@ -2540,13 +2544,14 @@ function renderNotifList(){
     wrap.appendChild(row);
   });
 }
-document.getElementById('notifBar').addEventListener('click', ()=>{
+function openNotifications(){
+  homeSubView = 'notifications';
+  showHomeSub('notifications');
   renderNotifList();
-  document.getElementById('notifOverlay').classList.remove('hidden');
-});
-document.getElementById('notifCloseBtn').addEventListener('click', ()=>{
-  document.getElementById('notifOverlay').classList.add('hidden');
-});
+  updateHeaderChrome();
+  renderHeaderFor('home');
+}
+document.getElementById('notifBar').addEventListener('click', openNotifications);
 document.getElementById('notifMarkAllBtn').addEventListener('click', ()=>{
   notifications.forEach(n=> n.read = true);
   saveNotifications();
@@ -2733,7 +2738,7 @@ document.getElementById('postPhotoFile').addEventListener('change', e=>{
   handleProfilePhoto(file);
 });
 document.getElementById('postStampBtn').addEventListener('click', ()=> openStampPicker('profile'));
-document.getElementById('myNameInput').addEventListener('change', async e=>{
+document.getElementById('myNameInput').addEventListener('input', async e=>{
   userName = e.target.value.trim() || 'あなた';
   await storageSet('jinkoumunou-user-name', userName, false);
   renderProfileFeed();
