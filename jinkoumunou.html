@@ -127,7 +127,7 @@
   .imagebubble{ padding:4px !important; background:none !important; border:none !important; box-shadow:none !important; }
   .imagebubble::after{ display:none; }
   .msgimage{ display:block; max-width:200px; max-height:200px; border-radius:12px; border:1px solid var(--border); }
-  .photobtn{ padding:8px 10px; font-size:16px; flex-shrink:0; }
+  .photobtn{ padding:8px 8px; font-size:15px; flex-shrink:0; }
   .bubble{
     position:relative; padding:9px 13px; border-radius:16px; font-size:15px; line-height:1.45;
     white-space:pre-wrap; word-break:break-word; border:1px solid; max-width:100%;
@@ -201,6 +201,27 @@
   .commentinputrow{ display:flex; gap:6px; margin-top:10px; }
   .commentinputrow input{ flex:1; padding:7px 10px; font-size:13px; }
   .commentinputrow button{ padding:7px 10px; font-size:13px; }
+  .composeactions{ display:flex; gap:8px; align-items:center; margin-top:8px; }
+  .postsubmit{ flex:1; padding:12px; font-size:15px; font-weight:700; }
+
+  .stampgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:6px 0; }
+  .stampgrid img{ width:100%; aspect-ratio:1; object-fit:contain; border-radius:8px; background:var(--input-bg); border:1px solid var(--input-border); cursor:pointer; padding:4px; }
+  .stampcell{ position:relative; }
+  .stampcell .delbadge{ position:absolute; top:-6px; right:-6px; width:20px; height:20px; font-size:12px; line-height:16px; }
+  .stampbubble{ background:none !important; border:none !important; box-shadow:none !important; padding:2px !important; }
+  .stampbubble::after{ display:none; }
+  .stampimg{ display:block; max-width:120px; max-height:120px; }
+
+  .notifheader{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .notifheader #notifMarkAllBtn{ padding:6px 10px; font-size:12px; }
+  .notifrow{ display:flex; align-items:flex-start; gap:10px; padding:10px 4px; border-bottom:1px solid var(--border); cursor:pointer; }
+  .notifrow.unread{ background:rgba(255,210,90,.18); }
+  .notificon{ font-size:18px; flex-shrink:0; margin-top:1px; }
+  .notifbody{ flex:1; min-width:0; }
+  .notifline1{ font-size:13px; }
+  .notifline1 b{ font-weight:700; }
+  .notifline2{ font-size:12px; color:var(--dim); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .notiftime{ font-size:11px; color:var(--dim); flex-shrink:0; white-space:nowrap; }
 
   .inputbar{
     display:flex; align-items:center; gap:8px; padding:8px 10px; flex-shrink:0;
@@ -209,11 +230,11 @@
     box-shadow:0 1px 0 rgba(255,255,255,.4) inset;
   }
   .inputbar input{
-    flex:1; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-main);
+    flex:1; min-width:0; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-main);
     border-radius:6px; padding:8px 12px; font-size:15px; outline:none; font-family:inherit;
     box-shadow:inset 0 1px 3px rgba(0,0,0,.25);
   }
-  .inputbar button{ font-size:14px; padding:8px 14px; cursor:pointer; font-family:inherit; }
+  .inputbar button{ font-size:14px; padding:8px 14px; cursor:pointer; font-family:inherit; white-space:nowrap; flex-shrink:0; }
 
   .tabbar{
     display:flex; flex-shrink:0;
@@ -315,6 +336,16 @@
     <div class="notifbar hidden" id="notifBar">🔔 <span id="notifCount"></span> 件の通知</div>
     <div class="listwrap" id="homeListWrap"></div>
 
+    <div class="panel hidden" id="homeNotifications">
+      <div class="listwrap">
+        <div class="notifheader">
+          <span class="section-title" style="margin-bottom:0;">通知</span>
+          <button class="glossy" id="notifMarkAllBtn" type="button">すべて既読</button>
+        </div>
+        <div id="notifList"></div>
+      </div>
+    </div>
+
     <div class="panel hidden" id="homeBotProfile">
       <div class="profilewrap">
         <div class="profilebanner" id="profileBanner"></div>
@@ -339,6 +370,7 @@
       <div class="inputbar">
         <button class="photobtn glossy" id="homeBotPhotoBtn" type="button">📷</button>
         <input type="file" id="homeBotPhotoFile" accept="image/*" style="display:none;">
+        <button class="photobtn glossy" id="homeBotStampBtn" type="button">🏷️</button>
         <input type="text" id="homeBotInput" placeholder="新しいメッセージ" autocomplete="off">
         <button id="homeBotSend" class="glossy">送信</button>
       </div>
@@ -390,6 +422,7 @@
       <div class="inputbar">
         <button class="photobtn glossy" id="homeGroupPhotoBtn" type="button">📷</button>
         <input type="file" id="homeGroupPhotoFile" accept="image/*" style="display:none;">
+        <button class="photobtn glossy" id="homeGroupStampBtn" type="button">🏷️</button>
         <input type="text" id="homeGroupInput" placeholder="新しいメッセージ" autocomplete="off">
         <button id="homeGroupSend" class="glossy">送信</button>
       </div>
@@ -412,6 +445,11 @@
         <div class="section">
           <div class="section-title">メンバーを編集</div>
           <div id="groupSettingsMembers"></div>
+        </div>
+        <div class="section">
+          <div class="section-title">スタンプ（アプリ全体で共有）</div>
+          <div id="groupStampGrid" class="stampgrid"></div>
+          <div class="filerow"><label class="glossy">スタンプを追加<input type="file" id="addStampFile" accept="image/*"></label></div>
         </div>
         <div class="section">
           <button class="actionbtn glossy danger" id="groupSettingsDelete">グループを削除</button>
@@ -552,7 +590,12 @@
       <div class="profilename" id="myProfileName"></div>
       <div class="composebox">
         <textarea id="postInput" class="forminput" rows="2" placeholder="いまどうしてる？"></textarea>
-        <button class="glossy" id="postSubmitBtn" style="margin-top:6px; width:100%;">投稿</button>
+        <div class="composeactions">
+          <button class="photobtn glossy" id="postPhotoBtn" type="button">📷</button>
+          <input type="file" id="postPhotoFile" accept="image/*" style="display:none;">
+          <button class="photobtn glossy" id="postStampBtn" type="button">🏷️</button>
+          <button class="glossy postsubmit" id="postSubmitBtn">投稿</button>
+        </div>
       </div>
       <div id="postsFeed"></div>
     </div>
@@ -565,11 +608,11 @@
     <button class="tabbtn" data-tab="settings"><span class="icon">⚙️</span>設定</button>
   </div>
 
-  <div class="sheetOverlay hidden" id="notifOverlay">
-    <div class="actionSheet" style="max-height:65vh; overflow-y:auto;">
-      <div class="section-title">通知</div>
-      <div id="notifList"></div>
-      <button class="glossy" id="notifCloseBtn">閉じる</button>
+  <div class="sheetOverlay hidden" id="stampPickerOverlay">
+    <div class="actionSheet" style="max-height:60vh; overflow-y:auto;">
+      <div class="section-title">スタンプを選択</div>
+      <div id="stampGrid" class="stampgrid"></div>
+      <button class="glossy" id="stampPickerCancel">キャンセル</button>
     </div>
   </div>
 
@@ -668,6 +711,8 @@ let userName = 'あなた';
 let userHeader = null;
 let posts = [];
 let notifications = [];
+let stamps = [];
+let stampPickerContext = null;
 
 function uid(){ try{ return crypto.randomUUID(); }catch(e){ return 'x'+Date.now()+Math.floor(Math.random()*1000); } }
 function randomColor(){ return PALETTE[Math.floor(Math.random()*PALETTE.length)]; }
@@ -890,7 +935,13 @@ function renderMsg(entry, containerId, showName, contextType, contextId){
     col.appendChild(q);
   }
   let bubble;
-  if(entry.kind === 'image'){
+  if(entry.kind === 'stamp'){
+    bubble = document.createElement('div');
+    bubble.className = 'bubble stampbubble ' + entry.who;
+    const img = document.createElement('img');
+    img.src = entry.image; img.className = 'stampimg';
+    bubble.appendChild(img);
+  } else if(entry.kind === 'image'){
     bubble = document.createElement('div');
     bubble.className = 'bubble imagebubble ' + entry.who;
     const img = document.createElement('img');
@@ -1270,7 +1321,7 @@ function updateHeaderChrome(){
 
 /* ---- タブ切替 ---- */
 function showHomeSub(view){
-  const map = { list:'homeListWrap', botchat:'homeBotChat', botprofile:'homeBotProfile', botsettings:'homeBotSettings', groupchat:'homeGroupChat', groupsettings:'homeGroupSettings', newgroup:'homeNewGroup', newbot:'homeNewBot' };
+  const map = { list:'homeListWrap', notifications:'homeNotifications', botchat:'homeBotChat', botprofile:'homeBotProfile', botsettings:'homeBotSettings', groupchat:'homeGroupChat', groupsettings:'homeGroupSettings', newgroup:'homeNewGroup', newbot:'homeNewBot' };
   Object.values(map).forEach(id=> document.getElementById(id).classList.add('hidden'));
   document.getElementById(map[view]).classList.remove('hidden');
 }
@@ -1326,6 +1377,7 @@ async function saveBg(){
 }
 async function savePosts(){ try{ await storageSet('jinkoumunou-posts', JSON.stringify(posts), false); }catch(e){ console.error(e); } }
 async function saveNotifications(){ try{ await storageSet('jinkoumunou-notifications', JSON.stringify(notifications), false); }catch(e){ console.error(e); } }
+async function saveStamps(){ try{ await storageSet('jinkoumunou-stamps', JSON.stringify(stamps), false); }catch(e){ console.error(e); } }
 function trimAndSavePlaza(){ if(plazaLog.length > MAX_LOG) plazaLog = plazaLog.slice(plazaLog.length - MAX_LOG); savePlazaLog(); }
 
 async function loadAll(){
@@ -1346,6 +1398,7 @@ async function loadAll(){
   try{ const r = await storageGet('jinkoumunou-posts', false); if(r && r.value) posts = JSON.parse(r.value); }catch(e){}
   posts.forEach(p=>{ if(!p.votes) p.votes = { voters:{} }; if(!p.comments) p.comments = []; p.comments.forEach(c=>{ if(!c.votes) c.votes = { voters:{} }; }); });
   try{ const r = await storageGet('jinkoumunou-notifications', false); if(r && r.value) notifications = JSON.parse(r.value); }catch(e){}
+  try{ const r = await storageGet('jinkoumunou-stamps', false); if(r && r.value) stamps = JSON.parse(r.value); }catch(e){}
   try{ const r = await storageGet('jinkoumunou-likedislike-enabled', false); if(r && r.value) likeDislikeEnabled = r.value==='true'; }catch(e){}
   try{ const r = await storageGet('jinkoumunou-plaza-enabled', false); if(r && r.value) plazaEnabled = r.value==='true'; }catch(e){}
   try{ const r = await storageGet('jinkoumunou-plaza-participants', false); if(r && r.value) plazaParticipantIds = JSON.parse(r.value); }catch(e){}
@@ -1661,18 +1714,26 @@ async function handleBotSend(){
   const frags = tokenize(text);
   input.value = '';
   await delay(250 + Math.random()*400);
-  const reply = generateReply(bot.vocab, frags);
-  const botEntry = { who:'bot', text:reply, botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, ts:Date.now(), mid:uid() };
+  let botEntry;
+  if(stamps.length > 0 && Math.random() < 0.15){
+    const st = pick(stamps);
+    botEntry = { who:'bot', kind:'stamp', image:st.image, text:'(スタンプ)', botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, ts:Date.now(), mid:uid() };
+    bot.lastMessage = '(スタンプ)';
+  } else {
+    const reply = generateReply(bot.vocab, frags);
+    botEntry = { who:'bot', text:reply, botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, ts:Date.now(), mid:uid() };
+    bot.lastMessage = reply;
+    botsHear([bot.id], reply);
+    if(bot.ttsEnabled) speak(reply);
+  }
   individualChats[bot.id].push(botEntry);
   renderMsg(botEntry, 'homeBotLog', false, 'bot', bot.id);
-  bot.lastMessage = reply; bot.lastTime = Date.now();
-  botsHear([bot.id], reply);
+  bot.lastTime = Date.now();
   if(Math.random() < 0.3){
     if(!userEntry.reactions) userEntry.reactions = {};
     userEntry.reactions[bot.id] = pick(REACTION_EMOJIS);
     refreshReactionRow(userEntry);
   }
-  if(bot.ttsEnabled) speak(reply);
   if(individualChats[bot.id].length > MAX_LOG) individualChats[bot.id] = individualChats[bot.id].slice(individualChats[bot.id].length - MAX_LOG);
   await Promise.all([saveBots(), saveIndividualChats()]);
 }
@@ -1702,6 +1763,28 @@ async function handleBotPhoto(file){
     }
   }catch(err){ console.error(err); }
 }
+async function handleBotStamp(st){
+  if(!st || !currentBotId) return;
+  const bot = bots.find(b=>b.id===currentBotId);
+  if(!bot) return;
+  const userEntry = { who:'user', kind:'stamp', image:st.image, text:'(スタンプ)', ts:Date.now(), mid:uid() };
+  if(replyTarget) userEntry.replyTo = { name:replyTarget.name, text:replyTarget.text };
+  clearReplyTarget();
+  if(!individualChats[bot.id]) individualChats[bot.id] = [];
+  individualChats[bot.id].push(userEntry);
+  checkDateSeparator('homeBotLog', userEntry.ts, homeBotDayState);
+  renderMsg(userEntry, 'homeBotLog', false, 'bot', bot.id);
+  bot.lastMessage = '(スタンプ)'; bot.lastTime = Date.now();
+  if(individualChats[bot.id].length > MAX_LOG) individualChats[bot.id] = individualChats[bot.id].slice(individualChats[bot.id].length - MAX_LOG);
+  await Promise.all([saveBots(), saveIndividualChats()]);
+  await delay(300 + Math.random()*500);
+  if(Math.random() < 0.85){
+    if(!userEntry.reactions) userEntry.reactions = {};
+    userEntry.reactions[bot.id] = pick(REACTION_EMOJIS);
+    refreshReactionRow(userEntry);
+    await saveIndividualChats();
+  }
+}
 document.getElementById('homeBotSend').addEventListener('click', handleBotSend);
 document.getElementById('homeBotInput').addEventListener('keydown', e=>{ if(e.key==='Enter') handleBotSend(); });
 document.getElementById('homeBotReplyCancel').addEventListener('click', clearReplyTarget);
@@ -1711,6 +1794,7 @@ document.getElementById('homeBotPhotoFile').addEventListener('change', e=>{
   e.target.value = '';
   handleBotPhoto(file);
 });
+document.getElementById('homeBotStampBtn').addEventListener('click', ()=> openStampPicker('bot'));
 
 /* ---- 人工無脳ごとの設定 ---- */
 function renderBotVocabList(bot){
@@ -1911,6 +1995,7 @@ function openGroupSettings(id){
   renderGroupSettingsAvatarPreview(group);
   document.getElementById('groupSettingsBgPreview').style.backgroundImage = group.bg ? `url(${group.bg})` : '';
   renderGroupMemberEditor(group);
+  renderGroupStampGrid();
   updateHeaderChrome();
   renderHeaderFor('home');
 }
@@ -1979,12 +2064,20 @@ async function handleGroupSend(){
 
   for(const bot of responders){
     await delay(250 + Math.random()*400);
-    const reply = generateReply(bot.vocab, frags);
-    const botEntry = { who:'bot', text:reply, botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, ts:Date.now(), mid:uid() };
+    let botEntry;
+    if(stamps.length > 0 && Math.random() < 0.15){
+      const st = pick(stamps);
+      botEntry = { who:'bot', kind:'stamp', image:st.image, text:'(スタンプ)', botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, ts:Date.now(), mid:uid() };
+      bot.lastMessage = '(スタンプ)';
+    } else {
+      const reply = generateReply(bot.vocab, frags);
+      botEntry = { who:'bot', text:reply, botId:bot.id, botName:bot.name, botColor:bot.color, botAvatar:bot.avatar||null, ts:Date.now(), mid:uid() };
+      bot.lastMessage = reply;
+      botsHear([bot.id], reply);
+    }
     groupChats[group.id].push(botEntry);
     renderGroupEntry(botEntry, showName, group.id);
-    bot.lastMessage = reply; bot.lastTime = Date.now();
-    botsHear([bot.id], reply);
+    bot.lastTime = Date.now();
   }
   const last = groupChats[group.id][groupChats[group.id].length-1];
   group.lastMessage = last ? last.text : group.lastMessage;
@@ -2021,6 +2114,31 @@ async function handleGroupPhoto(file){
     await saveGroupChats();
   }catch(err){ console.error(err); }
 }
+async function handleGroupStamp(st){
+  if(!st || !currentGroupId) return;
+  const group = groups.find(g=>g.id===currentGroupId);
+  if(!group) return;
+  const memberBots = bots.filter(b=>group.memberIds.includes(b.id));
+  const showName = memberBots.length > 1;
+  const userEntry = { who:'user', kind:'stamp', image:st.image, text:'(スタンプ)', ts:Date.now(), mid:uid() };
+  if(replyTarget) userEntry.replyTo = { name:replyTarget.name, text:replyTarget.text };
+  clearReplyTarget();
+  if(!groupChats[group.id]) groupChats[group.id] = [];
+  groupChats[group.id].push(userEntry);
+  renderGroupEntry(userEntry, showName, group.id);
+  group.lastMessage = '(スタンプ)'; group.lastTime = Date.now();
+  if(groupChats[group.id].length > MAX_LOG) groupChats[group.id] = groupChats[group.id].slice(groupChats[group.id].length - MAX_LOG);
+  await Promise.all([saveGroups(), saveGroupChats()]);
+  for(const bot of memberBots){
+    if(Math.random() < 0.5){
+      await delay(200 + Math.random()*500);
+      if(!userEntry.reactions) userEntry.reactions = {};
+      userEntry.reactions[bot.id] = pick(REACTION_EMOJIS);
+      refreshReactionRow(userEntry);
+    }
+  }
+  await saveGroupChats();
+}
 document.getElementById('homeGroupSend').addEventListener('click', handleGroupSend);
 document.getElementById('homeGroupInput').addEventListener('keydown', e=>{ if(e.key==='Enter') handleGroupSend(); });
 document.getElementById('homeGroupReplyCancel').addEventListener('click', clearReplyTarget);
@@ -2029,6 +2147,66 @@ document.getElementById('homeGroupPhotoFile').addEventListener('change', e=>{
   const file = e.target.files[0];
   e.target.value = '';
   handleGroupPhoto(file);
+});
+document.getElementById('homeGroupStampBtn').addEventListener('click', ()=> openStampPicker('group'));
+
+/* ---- スタンプ ---- */
+function openStampPicker(context){
+  stampPickerContext = context;
+  renderStampGrid();
+  document.getElementById('stampPickerOverlay').classList.remove('hidden');
+}
+function renderStampGrid(){
+  const wrap = document.getElementById('stampGrid');
+  wrap.innerHTML = '';
+  if(stamps.length === 0){
+    wrap.innerHTML = '<div class="listpreview" style="grid-column:1/-1;">スタンプがありません。グループ設定から追加できます。</div>';
+    return;
+  }
+  stamps.forEach(st=>{
+    const img = document.createElement('img');
+    img.src = st.image;
+    img.addEventListener('click', ()=>{
+      document.getElementById('stampPickerOverlay').classList.add('hidden');
+      if(stampPickerContext === 'bot') handleBotStamp(st);
+      else if(stampPickerContext === 'group') handleGroupStamp(st);
+      else if(stampPickerContext === 'profile') handleProfileStamp(st);
+    });
+    wrap.appendChild(img);
+  });
+}
+document.getElementById('stampPickerCancel').addEventListener('click', ()=>{
+  document.getElementById('stampPickerOverlay').classList.add('hidden');
+});
+function renderGroupStampGrid(){
+  const wrap = document.getElementById('groupStampGrid');
+  wrap.innerHTML = '';
+  if(stamps.length === 0){
+    wrap.innerHTML = '<div class="listpreview" style="grid-column:1/-1;">まだスタンプがありません。</div>';
+    return;
+  }
+  stamps.forEach((st, idx)=>{
+    const cell = document.createElement('div'); cell.className = 'stampcell';
+    const img = document.createElement('img'); img.src = st.image;
+    const del = document.createElement('button'); del.className = 'delbadge'; del.textContent = '－';
+    del.addEventListener('click', async ()=>{
+      stamps.splice(idx, 1);
+      await saveStamps();
+      renderGroupStampGrid();
+    });
+    cell.appendChild(img); cell.appendChild(del);
+    wrap.appendChild(cell);
+  });
+}
+document.getElementById('addStampFile').addEventListener('change', async e=>{
+  const file = e.target.files[0]; if(!file) return;
+  e.target.value = '';
+  try{
+    const dataUrl = await resizeImage(file, 300, 0.85);
+    stamps.push({ id:uid(), image:dataUrl });
+    await saveStamps();
+    renderGroupStampGrid();
+  }catch(err){ console.error(err); }
 });
 
 /* ---- @メンション ---- */
@@ -2322,21 +2500,31 @@ function renderNotifList(){
   const wrap = document.getElementById('notifList');
   wrap.innerHTML = '';
   if(notifications.length === 0){
-    wrap.innerHTML = '<div class="listpreview">通知はありません。</div>';
+    wrap.innerHTML = '<div class="listpreview" style="padding:16px 4px;">通知はありません。</div>';
     return;
   }
   notifications.forEach(n=>{
     const row = document.createElement('div');
-    row.className = 'listrow';
-    const info = document.createElement('div');
-    info.className = 'listinfo';
-    const t1 = document.createElement('div');
-    t1.className = 'listname';
-    t1.textContent = n.type === 'vote' ? `${n.botName} があなたの投稿に${n.text}` : `${n.botName}: ${n.text}`;
-    const t2 = document.createElement('div');
-    t2.className = 'listpreview'; t2.textContent = formatTime(n.ts);
-    info.appendChild(t1); info.appendChild(t2);
-    row.appendChild(info);
+    row.className = 'notifrow' + (n.read ? '' : ' unread');
+    const icon = document.createElement('div');
+    icon.className = 'notificon';
+    icon.textContent = n.type === 'vote' ? (n.text.includes('高評価') ? '👍' : '👎') : '💬';
+    const body = document.createElement('div');
+    body.className = 'notifbody';
+    const line1 = document.createElement('div');
+    line1.className = 'notifline1';
+    const b = document.createElement('b'); b.textContent = n.botName;
+    line1.appendChild(b);
+    line1.appendChild(document.createTextNode(n.type === 'vote' ? ` があなたの投稿に${n.text}` : ' がコメントしました'));
+    body.appendChild(line1);
+    if(n.type === 'comment'){
+      const line2 = document.createElement('div');
+      line2.className = 'notifline2'; line2.textContent = n.text;
+      body.appendChild(line2);
+    }
+    const time = document.createElement('div');
+    time.className = 'notiftime'; time.textContent = formatTime(n.ts);
+    row.appendChild(icon); row.appendChild(body); row.appendChild(time);
     row.addEventListener('click', ()=>{
       n.read = true;
       saveNotifications();
@@ -2358,6 +2546,12 @@ document.getElementById('notifBar').addEventListener('click', ()=>{
 });
 document.getElementById('notifCloseBtn').addEventListener('click', ()=>{
   document.getElementById('notifOverlay').classList.add('hidden');
+});
+document.getElementById('notifMarkAllBtn').addEventListener('click', ()=>{
+  notifications.forEach(n=> n.read = true);
+  saveNotifications();
+  updateNotifBar();
+  renderNotifList();
 });
 
 function renderMySettingsAvatarPreview(){
@@ -2405,8 +2599,15 @@ function renderProfileFeed(){
     const tm = document.createElement('span'); tm.className = 'ptime'; tm.textContent = formatTime(post.ts);
     header.appendChild(nm); header.appendChild(tm);
     card.appendChild(header);
-    const txt = document.createElement('div'); txt.className = 'posttext'; txt.textContent = post.text;
-    card.appendChild(txt);
+    if(post.kind === 'image' || post.kind === 'stamp'){
+      const img = document.createElement('img');
+      img.src = post.image;
+      img.style.cssText = post.kind === 'stamp' ? 'max-width:120px;max-height:120px;display:block;margin:6px 0;' : 'max-width:100%;max-height:260px;border-radius:8px;display:block;margin:6px 0;';
+      card.appendChild(img);
+    } else {
+      const txt = document.createElement('div'); txt.className = 'posttext'; txt.textContent = post.text;
+      card.appendChild(txt);
+    }
     card.appendChild(renderSimpleVoteRow(post, castProfileVote));
     (post.comments || []).forEach(c=>{
       const ci = document.createElement('div'); ci.className = 'commentitem';
@@ -2435,7 +2636,20 @@ function renderProfileFeed(){
     wrap.appendChild(card);
   });
 }
+async function engageBotsWithComment(post, comment, excludeBotId){
+  for(const bot of bots){
+    if(bot.id === excludeBotId) continue;
+    if(Math.random() < 0.35){
+      await delay(150 + Math.random()*350);
+      if(!comment.votes) comment.votes = { voters:{} };
+      comment.votes.voters[bot.id] = Math.random() < 0.5 ? 'up' : 'down';
+      renderProfileFeed();
+    }
+  }
+  await savePosts();
+}
 async function engageBotsWithPost(post){
+  const textOnly = !post.kind;
   for(const bot of bots){
     if(Math.random() < 0.5){
       await delay(300 + Math.random()*600);
@@ -2446,7 +2660,7 @@ async function engageBotsWithPost(post){
       await savePosts();
       renderProfileFeed();
     }
-    if(Math.random() < 0.25){
+    if(textOnly && Math.random() < 0.25){
       await delay(300 + Math.random()*600);
       const frags = tokenize(post.text);
       const commentText = generateReply(bot.vocab, frags);
@@ -2456,6 +2670,7 @@ async function engageBotsWithPost(post){
       addNotification({ type:'comment', postId:post.id, commentId:comment.id, botId:bot.id, botName:bot.name, text:commentText, ts:Date.now() });
       await Promise.all([savePosts(), saveBots()]);
       renderProfileFeed();
+      await engageBotsWithComment(post, comment, bot.id);
     }
   }
 }
@@ -2465,6 +2680,7 @@ async function addUserComment(post, text){
   botsHear(bots.map(b=>b.id), text);
   await Promise.all([savePosts(), saveBots()]);
   renderProfileFeed();
+  await engageBotsWithComment(post, comment, null);
   for(const bot of bots){
     if(Math.random() < 0.4){
       await delay(300 + Math.random()*600);
@@ -2476,8 +2692,27 @@ async function addUserComment(post, text){
       addNotification({ type:'comment', postId:post.id, commentId:botComment.id, botId:bot.id, botName:bot.name, text:reply, ts:Date.now() });
       await Promise.all([savePosts(), saveBots()]);
       renderProfileFeed();
+      await engageBotsWithComment(post, botComment, bot.id);
     }
   }
+}
+async function handleProfilePhoto(file){
+  if(!file) return;
+  try{
+    const dataUrl = await resizeImage(file, 800, 0.75);
+    const post = { id:uid(), kind:'image', image:dataUrl, text:'(写真)', ts:Date.now(), votes:{voters:{}}, comments:[] };
+    posts.push(post);
+    await savePosts();
+    renderProfileFeed();
+    await engageBotsWithPost(post);
+  }catch(err){ console.error(err); }
+}
+async function handleProfileStamp(st){
+  const post = { id:uid(), kind:'stamp', image:st.image, text:'(スタンプ)', ts:Date.now(), votes:{voters:{}}, comments:[] };
+  posts.push(post);
+  await savePosts();
+  renderProfileFeed();
+  await engageBotsWithPost(post);
 }
 document.getElementById('postSubmitBtn').addEventListener('click', async ()=>{
   const ta = document.getElementById('postInput');
@@ -2491,6 +2726,13 @@ document.getElementById('postSubmitBtn').addEventListener('click', async ()=>{
   renderProfileFeed();
   await engageBotsWithPost(post);
 });
+document.getElementById('postPhotoBtn').addEventListener('click', ()=> document.getElementById('postPhotoFile').click());
+document.getElementById('postPhotoFile').addEventListener('change', e=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  handleProfilePhoto(file);
+});
+document.getElementById('postStampBtn').addEventListener('click', ()=> openStampPicker('profile'));
 document.getElementById('myNameInput').addEventListener('change', async e=>{
   userName = e.target.value.trim() || 'あなた';
   await storageSet('jinkoumunou-user-name', userName, false);
