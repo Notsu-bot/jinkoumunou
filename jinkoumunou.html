@@ -197,6 +197,8 @@
   .commentitem .avatar{ width:24px; height:24px; font-size:11px; flex-shrink:0; }
   .commentwrap{ flex:1; min-width:0; }
   .commentname{ font-size:11px; font-weight:700; color:var(--dim); }
+  .commenttime{ font-size:10px; color:var(--dim); }
+  .commenttoggle{ display:block; width:100%; text-align:center; padding:8px; font-size:12px; margin-top:8px; }
   .commentbubble{ background:var(--input-bg); border-radius:10px; padding:6px 10px; font-size:13px; margin-top:2px; word-break:break-word; }
   .commentinputrow{ display:flex; gap:6px; margin-top:10px; }
   .commentinputrow input{ flex:1; padding:7px 10px; font-size:13px; }
@@ -705,7 +707,7 @@ let newGroupMemberSet = new Set();
 let plazaTimer = null;
 let replyTarget = null;   // { mid, name, text } - 返信中のメッセージ
 let reactionTarget = null; // { entry, contextType, contextId } - リアクション選択中
-let mentionActiveInputId = null;
+let mentionActiveInputEl = null;
 let profileReturnTo = null;
 let userName = 'あなた';
 let userHeader = null;
@@ -713,6 +715,8 @@ let posts = [];
 let notifications = [];
 let stamps = [];
 let stampPickerContext = null;
+let commentStampTarget = null;
+let expandedPosts = new Set();
 
 function uid(){ try{ return crypto.randomUUID(); }catch(e){ return 'x'+Date.now()+Math.floor(Math.random()*1000); } }
 function randomColor(){ return PALETTE[Math.floor(Math.random()*PALETTE.length)]; }
@@ -722,6 +726,10 @@ function nowHHMM(){ const d=new Date(); return `${String(d.getHours()).padStart(
 function formatTime(epoch){
   const d = new Date(epoch);
   return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function formatFullDateTime(epoch){
+  const d = new Date(epoch);
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 function formatDateLabel(epoch){
   const d = new Date(epoch);
@@ -2176,6 +2184,7 @@ function renderStampGrid(){
       if(stampPickerContext === 'bot') handleBotStamp(st);
       else if(stampPickerContext === 'group') handleGroupStamp(st);
       else if(stampPickerContext === 'profile') handleProfileStamp(st);
+      else if(stampPickerContext === 'comment' && commentStampTarget) addUserComment(commentStampTarget, '', { kind:'stamp', image:st.image });
     });
     wrap.appendChild(img);
   });
@@ -2215,17 +2224,16 @@ document.getElementById('addStampFile').addEventListener('change', async e=>{
 });
 
 /* ---- @メンション ---- */
-function setupMentionTrigger(inputId, getMembers){
-  const input = document.getElementById(inputId);
-  input.addEventListener('input', ()=>{
-    if(input.value.endsWith('@')){
+function attachMentionTrigger(inputEl, getMembers){
+  inputEl.addEventListener('input', ()=>{
+    if(inputEl.value.endsWith('@')){
       const members = getMembers();
-      if(members.length > 0) showMentionPicker(inputId, members);
+      if(members.length > 0) showMentionPicker(inputEl, members);
     }
   });
 }
-function showMentionPicker(inputId, members){
-  mentionActiveInputId = inputId;
+function showMentionPicker(inputEl, members){
+  mentionActiveInputEl = inputEl;
   const wrap = document.getElementById('mentionList');
   wrap.innerHTML = '';
   members.forEach(b=>{
@@ -2234,10 +2242,11 @@ function showMentionPicker(inputId, members){
     btn.style.cssText = 'display:block;width:100%;text-align:left;padding:10px;margin-top:6px;';
     btn.textContent = b.name;
     btn.addEventListener('click', ()=>{
-      const input = document.getElementById(mentionActiveInputId);
-      input.value = input.value.slice(0, -1) + '@' + b.name + ' ';
+      if(mentionActiveInputEl){
+        mentionActiveInputEl.value = mentionActiveInputEl.value.slice(0, -1) + '@' + b.name + ' ';
+        mentionActiveInputEl.focus();
+      }
       document.getElementById('mentionOverlay').classList.add('hidden');
-      input.focus();
     });
     wrap.appendChild(btn);
   });
@@ -2246,8 +2255,8 @@ function showMentionPicker(inputId, members){
 document.getElementById('mentionCancel').addEventListener('click', ()=>{
   document.getElementById('mentionOverlay').classList.add('hidden');
 });
-setupMentionTrigger('homeBotInput', ()=> currentBotId ? [bots.find(b=>b.id===currentBotId)].filter(Boolean) : []);
-setupMentionTrigger('homeGroupInput', ()=>{
+attachMentionTrigger(document.getElementById('homeBotInput'), ()=> currentBotId ? [bots.find(b=>b.id===currentBotId)].filter(Boolean) : []);
+attachMentionTrigger(document.getElementById('homeGroupInput'), ()=>{
   const group = groups.find(g=>g.id===currentGroupId);
   if(!group) return [];
   return bots.filter(b=>group.memberIds.includes(b.id));
@@ -2614,30 +2623,76 @@ function renderProfileFeed(){
       card.appendChild(txt);
     }
     card.appendChild(renderSimpleVoteRow(post, castProfileVote));
-    (post.comments || []).forEach(c=>{
-      const ci = document.createElement('div'); ci.className = 'commentitem';
-      ci.appendChild(c.who === 'bot' ? avatarEl(c.botName, c.botColor, c.botAvatar) : avatarEl(userName, '#4fbf67', userAvatar));
-      const cwrap = document.createElement('div'); cwrap.className = 'commentwrap';
-      const cname = document.createElement('div'); cname.className = 'commentname';
-      cname.textContent = c.who === 'bot' ? c.botName : (userName || 'あなた');
-      const cbubble = document.createElement('div'); cbubble.className = 'commentbubble'; cbubble.textContent = c.text;
-      cwrap.appendChild(cname); cwrap.appendChild(cbubble);
-      cwrap.appendChild(renderSimpleVoteRow(c, castProfileVote));
-      ci.appendChild(cwrap);
-      card.appendChild(ci);
+
+    const commentCount = (post.comments || []).length;
+    const isOpen = expandedPosts.has(post.id);
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'commenttoggle glossy';
+    toggleBtn.type = 'button';
+    toggleBtn.textContent = isOpen ? `コメントを隠す (${commentCount})` : `コメントを見る (${commentCount})`;
+    toggleBtn.addEventListener('click', ()=>{
+      if(expandedPosts.has(post.id)) expandedPosts.delete(post.id); else expandedPosts.add(post.id);
+      renderProfileFeed();
     });
-    const inputRow = document.createElement('div'); inputRow.className = 'commentinputrow';
-    const cinput = document.createElement('input');
-    cinput.type = 'text'; cinput.className = 'forminput'; cinput.placeholder = 'コメントする…';
-    const csend = document.createElement('button'); csend.className = 'glossy'; csend.textContent = '送信';
-    csend.addEventListener('click', ()=>{
-      const v = cinput.value.trim(); if(!v) return;
-      cinput.value = '';
-      addUserComment(post, v);
-    });
-    cinput.addEventListener('keydown', e=>{ if(e.key === 'Enter') csend.click(); });
-    inputRow.appendChild(cinput); inputRow.appendChild(csend);
-    card.appendChild(inputRow);
+    card.appendChild(toggleBtn);
+
+    if(isOpen){
+      (post.comments || []).forEach(c=>{
+        const ci = document.createElement('div'); ci.className = 'commentitem';
+        ci.appendChild(c.who === 'bot' ? avatarEl(c.botName, c.botColor, c.botAvatar) : avatarEl(userName, '#4fbf67', userAvatar));
+        const cwrap = document.createElement('div'); cwrap.className = 'commentwrap';
+        const cheader = document.createElement('div'); cheader.style.cssText = 'display:flex; align-items:baseline; gap:6px;';
+        const cname = document.createElement('span'); cname.className = 'commentname';
+        cname.textContent = c.who === 'bot' ? c.botName : (userName || 'あなた');
+        const ctime = document.createElement('span'); ctime.className = 'commenttime';
+        ctime.textContent = formatFullDateTime(c.ts);
+        cheader.appendChild(cname); cheader.appendChild(ctime);
+        cwrap.appendChild(cheader);
+        if(c.kind === 'image' || c.kind === 'stamp'){
+          const cimg = document.createElement('img');
+          cimg.src = c.image;
+          cimg.style.cssText = c.kind === 'stamp' ? 'max-width:90px;max-height:90px;display:block;margin-top:4px;' : 'max-width:180px;max-height:180px;border-radius:8px;display:block;margin-top:4px;';
+          cwrap.appendChild(cimg);
+        } else {
+          const cbubble = document.createElement('div'); cbubble.className = 'commentbubble'; cbubble.textContent = c.text;
+          cwrap.appendChild(cbubble);
+        }
+        cwrap.appendChild(renderSimpleVoteRow(c, castProfileVote));
+        ci.appendChild(cwrap);
+        card.appendChild(ci);
+      });
+      const inputRow = document.createElement('div'); inputRow.className = 'commentinputrow';
+      const cPhotoBtn = document.createElement('button');
+      cPhotoBtn.className = 'photobtn glossy'; cPhotoBtn.type = 'button'; cPhotoBtn.textContent = '📷';
+      const cPhotoFile = document.createElement('input');
+      cPhotoFile.type = 'file'; cPhotoFile.accept = 'image/*'; cPhotoFile.style.display = 'none';
+      cPhotoBtn.addEventListener('click', ()=> cPhotoFile.click());
+      cPhotoFile.addEventListener('change', e=>{
+        const file = e.target.files[0];
+        e.target.value = '';
+        if(file) addUserComment(post, '', { kind:'image', file });
+      });
+      const cStampBtn = document.createElement('button');
+      cStampBtn.className = 'photobtn glossy'; cStampBtn.type = 'button'; cStampBtn.textContent = '🏷️';
+      cStampBtn.addEventListener('click', ()=>{
+        commentStampTarget = post;
+        openStampPicker('comment');
+      });
+      const cinput = document.createElement('input');
+      cinput.type = 'text'; cinput.className = 'forminput'; cinput.placeholder = 'コメントする…（@でメンション）';
+      attachMentionTrigger(cinput, ()=> bots);
+      const csend = document.createElement('button'); csend.className = 'glossy'; csend.textContent = '送信';
+      csend.addEventListener('click', ()=>{
+        const v = cinput.value.trim(); if(!v) return;
+        cinput.value = '';
+        addUserComment(post, v);
+      });
+      cinput.addEventListener('keydown', e=>{ if(e.key === 'Enter') csend.click(); });
+      inputRow.appendChild(cPhotoBtn); inputRow.appendChild(cPhotoFile);
+      inputRow.appendChild(cStampBtn);
+      inputRow.appendChild(cinput); inputRow.appendChild(csend);
+      card.appendChild(inputRow);
+    }
     wrap.appendChild(card);
   });
 }
@@ -2679,15 +2734,28 @@ async function engageBotsWithPost(post){
     }
   }
 }
-async function addUserComment(post, text){
-  const comment = { id:uid(), who:'user', text, ts:Date.now(), votes:{voters:{}} };
+async function addUserComment(post, text, media){
+  let comment;
+  if(media){
+    let image = media.image;
+    if(media.kind === 'image' && media.file){
+      try{ image = await resizeImage(media.file, 800, 0.75); }catch(err){ console.error(err); return; }
+    }
+    comment = { id:uid(), who:'user', kind:media.kind, image, text: media.kind==='stamp' ? '(スタンプ)' : '(写真)', ts:Date.now(), votes:{voters:{}} };
+  } else {
+    comment = { id:uid(), who:'user', text, ts:Date.now(), votes:{voters:{}} };
+  }
+  expandedPosts.add(post.id);
   post.comments.push(comment);
-  botsHear(bots.map(b=>b.id), text);
+  if(!media) botsHear(bots.map(b=>b.id), text);
   await Promise.all([savePosts(), saveBots()]);
   renderProfileFeed();
   await engageBotsWithComment(post, comment, null);
+  if(media) return; // 写真・スタンプへは評価のみ、会話の続きは発生させない
+  const mentioned = bots.filter(b => text.includes('@'+b.name));
   for(const bot of bots){
-    if(Math.random() < 0.4){
+    const isMentioned = mentioned.includes(bot);
+    if(isMentioned || Math.random() < 0.4){
       await delay(300 + Math.random()*600);
       const frags = tokenize(text);
       const reply = generateReply(bot.vocab, frags);
